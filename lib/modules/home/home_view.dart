@@ -463,13 +463,33 @@ class HomeView extends GetView<HomeController> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Stock List',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
+            Row(
+              children: [
+                const Text(
+                  'Stock List',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Obx(() => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${controller.stockTotal.value}',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                )),
+              ],
             ),
             IconButton(
               onPressed: () => controller.fetchStockList(refresh: true),
@@ -488,13 +508,19 @@ class HomeView extends GetView<HomeController> {
           }
           if (controller.stockList.isEmpty) {
             return Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
               ),
-              child: const Center(child: Text('No records found')),
+              child: Column(
+                children: [
+                  Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey.withValues(alpha: 0.3)),
+                  const SizedBox(height: 12),
+                  const Text('No stock records found', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
             );
           }
           return ListView.separated(
@@ -505,60 +531,133 @@ class HomeView extends GetView<HomeController> {
             itemBuilder: (context, index) {
               final item = controller.stockList[index];
               return Container(
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 10,
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item['item_name']?.toString() ?? '—',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {},
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.inventory_2, color: AppColors.primary),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item['item_name']?.toString() ?? '—',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      item['company_name']?.toString() ?? '—',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      '${item['quantity'] ?? 0}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Divider(height: 1),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    _stockDetailItem(Icons.numbers, 'Code', item['code']),
+                                    const SizedBox(height: 6),
+                                    _stockDetailItem(Icons.qr_code, 'QR', item['qrcode']),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    _stockDetailItem(Icons.category_outlined, 'Group', item['group_name']),
+                                    const SizedBox(height: 6),
+                                    _stockDetailItem(Icons.fingerprint, 'ID', item['id']),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 36,
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _confirmDelete(context, item['id']?.toString() ?? ''),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: EdgeInsets.zero,
+                              ),
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              label: const Text('Remove Item', style: TextStyle(fontSize: 13)),
                             ),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Qty: ${item['quantity'] ?? 0}',
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: () => _confirmDelete(context, item['id']?.toString() ?? ''),
-                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                          tooltip: 'Delete',
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    _stockInfoRow(Icons.numbers, 'Code: ${item['code'] ?? '—'}'),
-                    _stockInfoRow(Icons.qr_code, 'QR: ${item['qrcode'] ?? '—'}'),
-                    _stockInfoRow(Icons.category_outlined, '${item['group_name'] ?? '—'}'),
-                    _stockInfoRow(Icons.business, '${item['company_name'] ?? '—'}'),
-                  ],
+                  ),
                 ),
               );
             },
@@ -584,16 +683,34 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
-  Widget _stockInfoRow(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.grey),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(color: Colors.grey, fontSize: 13))),
-        ],
-      ),
+  Widget _stockDetailItem(IconData icon, String label, dynamic value) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[400]),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                ),
+                TextSpan(
+                  text: value?.toString() ?? '—',
+                  style: TextStyle(
+                    color: Colors.grey[800],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 

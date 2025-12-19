@@ -38,7 +38,7 @@ class HomeView extends GetView<HomeController> {
           centerTitle: false,
           actions: [
             IconButton(
-              onPressed: () => _showLogoutDialog(context),
+              onPressed: () => _showLogoutDialog(),
               icon: const Icon(Icons.logout, color: Colors.white),
               tooltip: 'Logout',
             ),
@@ -166,8 +166,8 @@ class HomeView extends GetView<HomeController> {
                                     ),
                                   ),
                                   onTap: () {
-                                    Navigator.of(context).pop();
-                                    _showLogoutDialog(context);
+                                    Get.back();
+                                    _showLogoutDialog();
                                   },
                                 ),
                               ],
@@ -337,7 +337,7 @@ class HomeView extends GetView<HomeController> {
           SizedBox(
             height: 44,
             child: OutlinedButton.icon(
-              onPressed: () => _openCameraScanner(context),
+              onPressed: () => _openCameraScanner(),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
@@ -643,7 +643,7 @@ class HomeView extends GetView<HomeController> {
                             height: 36,
                             width: double.infinity,
                             child: OutlinedButton.icon(
-                              onPressed: () => _confirmDelete(context, item['id']?.toString() ?? ''),
+                              onPressed: () => _confirmDelete(item['id']?.toString() ?? ''),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.redAccent,
                                 side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
@@ -714,7 +714,7 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
-  void _confirmDelete(BuildContext context, String id) {
+  void _confirmDelete(String id) {
     if (id.isEmpty) return;
     Get.dialog(
       Dialog(
@@ -775,7 +775,7 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
-  void _showLogoutDialog(BuildContext context) {
+  void _showLogoutDialog() {
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -835,7 +835,7 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
-  void _openCameraScanner(BuildContext context) async {
+  void _openCameraScanner() async {
     final ok = await PermissionService.instance.ensureCameraPermission();
     if (!ok) return;
     var handled = false;

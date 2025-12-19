@@ -56,6 +56,8 @@ class HomeView extends GetView<HomeController> {
               _buildHeader(context, user),
               const SizedBox(height: 24),
               _buildScannerCard(context),
+              const SizedBox(height: 24),
+              _buildStockList(context),
               const SizedBox(height: 40),
             ],
           ),
@@ -449,6 +451,141 @@ class HomeView extends GetView<HomeController> {
               ],
             );
           }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStockList(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Stock List',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+            IconButton(
+              onPressed: () => controller.fetchStockList(refresh: true),
+              icon: const Icon(Icons.refresh, color: AppColors.primary),
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Obx(() {
+          if (controller.isLoadingStock.value && controller.stockList.isEmpty) {
+            return const Center(child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ));
+          }
+          if (controller.stockList.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+              ),
+              child: const Center(child: Text('No records found')),
+            );
+          }
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: controller.stockList.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final item = controller.stockList[index];
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                     BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item['item_name']?.toString() ?? '—',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Qty: ${item['quantity'] ?? 0}',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _stockInfoRow(Icons.numbers, 'Code: ${item['code'] ?? '—'}'),
+                    _stockInfoRow(Icons.qr_code, 'QR: ${item['qrcode'] ?? '—'}'),
+                    _stockInfoRow(Icons.category_outlined, '${item['group_name'] ?? '—'}'),
+                    _stockInfoRow(Icons.business, '${item['company_name'] ?? '—'}'),
+                  ],
+                ),
+              );
+            },
+          );
+        }),
+        Obx(() {
+           if (controller.stockList.length < controller.stockTotal.value) {
+             return Padding(
+               padding: const EdgeInsets.only(top: 12),
+               child: TextButton(
+                 onPressed: controller.isLoadingStock.value 
+                     ? null 
+                     : () => controller.fetchStockList(),
+                 child: controller.isLoadingStock.value 
+                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                     : const Text('Load More'),
+               ),
+             );
+           }
+           return const SizedBox.shrink();
+        }),
+      ],
+    );
+  }
+
+  Widget _stockInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(color: Colors.grey, fontSize: 13))),
         ],
       ),
     );

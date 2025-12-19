@@ -28,6 +28,55 @@ class HomeController extends GetxController {
   final storeQuantityController = TextEditingController(text: '1');
   final storeNotesController = TextEditingController();
 
+  final isLoadingStock = false.obs;
+  final stockList = <Map<String, dynamic>>[].obs;
+  final stockOffset = 0.obs;
+  final stockTotal = 0.obs;
+
+  Future<void> fetchStockList({bool refresh = false}) async {
+    if (refresh) {
+      stockOffset.value = 0;
+      stockList.clear();
+    }
+    isLoadingStock.value = true;
+    try {
+      final payload = {
+        'offset': stockOffset.value,
+        'search': {
+          'id': '',
+          'code': '',
+          'qrcode': '',
+          'item_name': '',
+          'group_name': '',
+          'company_name': '',
+          'quantity': {
+             'from': '',
+             'to': ''
+          }
+        }
+      };
+      final response = await _apiProvider.post(ApiEndpoints.stockRead, data: payload);
+      final ok = ApiResponseHandler.handleResponse(response, showSuccessMessage: false);
+      if (ok) {
+        final data = response['data'] is Map<String, dynamic> 
+            ? Map<String, dynamic>.from(response['data'] as Map) 
+            : <String, dynamic>{};
+            
+        stockTotal.value = int.tryParse(data['total']?.toString() ?? '0') ?? 0;
+        final records = data['record'];
+        if (records is List) {
+          final list = records.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          stockList.addAll(list);
+          stockOffset.value += list.length;
+        }
+      }
+    } catch (error) {
+      ApiResponseHandler.showErrorSnackbar(error.toString());
+    } finally {
+      isLoadingStock.value = false;
+    }
+  }
+
   Future<void> logout() async {
     await authController.clearSession();
     Get.offAllNamed(Routes.login);
@@ -184,6 +233,7 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
     fetchProfile();
+    fetchStockList(refresh: true);
   }
 
   @override

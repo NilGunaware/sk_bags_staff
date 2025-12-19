@@ -7,5 +7,6 @@ class ApiEndpoints {
   static const String getProfile = '/staff/auth/get_profile';
   static const String scanQrcode = '/staff/stock/scan_qrcode';
   static const String stockStoreCreate = '/staff/stock/store/0';
+  static const String stockRead = '/staff/stock/read';
 }
 

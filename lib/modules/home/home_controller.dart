@@ -235,6 +235,7 @@ class HomeController extends GetxController {
       final ok = ApiResponseHandler.handleResponse(response);
       if (ok) {
         resetScanner();
+        fetchStockList(refresh: true);
       }
     } catch (error) {
       ApiResponseHandler.showErrorSnackbar(error.toString());

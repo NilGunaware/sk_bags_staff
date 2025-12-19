@@ -19,6 +19,10 @@ class HomeController extends GetxController {
 
   final isProfileLoading = false.obs;
   final profile = Rx<Map<String, dynamic>?>(null);
+  final isScanning = false.obs;
+  final scanResult = Rx<Map<String, dynamic>?>(null);
+  final scanQrcodeController = TextEditingController();
+  final scanCodeController = TextEditingController();
 
   Future<void> logout() async {
     await authController.clearSession();
@@ -48,6 +52,28 @@ class HomeController extends GetxController {
       ApiResponseHandler.showErrorSnackbar(error.toString());
     } finally {
       isProfileLoading.value = false;
+    }
+  }
+  
+  Future<void> scanItem() async {
+    isScanning.value = true;
+    try {
+      final payload = {
+        'qrcode': scanQrcodeController.text.trim(),
+        'code': scanCodeController.text.trim(),
+      };
+      final response = await _apiProvider.post(ApiEndpoints.scanQrcode, data: payload);
+      final ok = ApiResponseHandler.handleResponse(response);
+      if (ok) {
+        final data = response['data'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(response['data'] as Map)
+            : <String, dynamic>{};
+        scanResult.value = data;
+      }
+    } catch (error) {
+      ApiResponseHandler.showErrorSnackbar(error.toString());
+    } finally {
+      isScanning.value = false;
     }
   }
 
@@ -106,6 +132,8 @@ class HomeController extends GetxController {
 
   @override
   void onClose() {
+    scanQrcodeController.dispose();
+    scanCodeController.dispose();
     super.onClose();
   }
 }

@@ -5,5 +5,6 @@ class ApiEndpoints {
   static const String apiAccessKey = 'ZkC6BDUzxz';
 
   static const String getProfile = '/staff/auth/get_profile';
+  static const String scanQrcode = '/staff/stock/scan_qrcode';
 }
 

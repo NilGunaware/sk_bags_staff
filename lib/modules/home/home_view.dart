@@ -51,6 +51,8 @@ class HomeView extends GetView<HomeController> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context, user),
+              const SizedBox(height: 24),
+              _buildScannerCard(context),
               const SizedBox(height: 40),
             ],
           ),
@@ -249,6 +251,117 @@ class HomeView extends GetView<HomeController> {
             ),
           ),
 
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannerCard(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.accent),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Scan QR/Barcode',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: controller.scanQrcodeController,
+            decoration: InputDecoration(
+              labelText: 'Qrcode',
+              hintText: 'Enter QR value',
+              prefixIcon: const Icon(Icons.qr_code_2),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: controller.scanCodeController,
+            decoration: InputDecoration(
+              labelText: 'Code',
+              hintText: 'Enter item code',
+              prefixIcon: const Icon(Icons.numbers),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 48,
+            child: Obx(() => ElevatedButton.icon(
+              onPressed: controller.isScanning.value ? null : controller.scanItem,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: controller.isScanning.value
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.qr_code_scanner),
+              label: Text(controller.isScanning.value ? 'Scanning...' : 'Scan'),
+            )),
+          ),
+          const SizedBox(height: 16),
+          Obx(() {
+            final data = controller.scanResult.value;
+            if (data == null || data.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Result',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _infoTile(Icons.sell_outlined, 'Item Code', data['item_code']),
+                _infoTile(Icons.label_important_outline, 'Item Name', data['item_name']),
+                _infoTile(Icons.qr_code_2, 'Item Qrcode', data['item_qrcode']),
+                _infoTile(Icons.category_outlined, 'Group', data['group_name']),
+                _infoTile(Icons.home_work_outlined, 'Company', data['company_name']),
+                Row(
+                  children: [
+                    Expanded(child: _infoTile(Icons.inventory_2_outlined, 'Quantity', data['quantity'])),
+                    Expanded(child: _infoTile(Icons.qr_code_scanner, 'Scanned Qty', data['scanned_quantity'])),
+                  ],
+                ),
+              ],
+            );
+          }),
         ],
       ),
     );

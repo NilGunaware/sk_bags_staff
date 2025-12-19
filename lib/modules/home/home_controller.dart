@@ -23,6 +23,10 @@ class HomeController extends GetxController {
   final scanResult = Rx<Map<String, dynamic>?>(null);
   final scanQrcodeController = TextEditingController();
   final scanCodeController = TextEditingController();
+  final isStoring = false.obs;
+  final storeUuidController = TextEditingController(text: '${DateTime.now().millisecondsSinceEpoch}');
+  final storeQuantityController = TextEditingController(text: '1');
+  final storeNotesController = TextEditingController();
 
   Future<void> logout() async {
     await authController.clearSession();
@@ -123,6 +127,58 @@ class HomeController extends GetxController {
       ApiResponseHandler.showErrorSnackbar('Download failed');
     }
   }
+  
+  void regenerateStoreUuid() {
+    storeUuidController.text = '${DateTime.now().millisecondsSinceEpoch}';
+  }
+  
+  void resetScanner() {
+    scanQrcodeController.clear();
+    scanCodeController.clear();
+    scanResult.value = null;
+    regenerateStoreUuid();
+    storeQuantityController.text = '1';
+    storeNotesController.clear();
+  }
+  
+  Future<void> storeScannedItem() async {
+    final current = scanResult.value;
+    if (current == null) {
+      ApiResponseHandler.showErrorSnackbar('Scan an item first');
+      return;
+    }
+    final itemId = current['item_id']?.toString() ?? '';
+    if (itemId.isEmpty) {
+      ApiResponseHandler.showErrorSnackbar('Invalid item');
+      return;
+    }
+    final qtyStr = storeQuantityController.text.trim();
+    final qty = int.tryParse(qtyStr) ?? 0;
+    if (qty <= 0) {
+      ApiResponseHandler.showErrorSnackbar('Enter a valid quantity');
+      return;
+    }
+    isStoring.value = true;
+    try {
+      final payload = {
+        'uuid': storeUuidController.text.trim().isEmpty
+            ? '${DateTime.now().millisecondsSinceEpoch}'
+            : storeUuidController.text.trim(),
+        'item_id': itemId,
+        'quantity': qtyStr,
+        'notes': storeNotesController.text.trim(),
+      };
+      final response = await _apiProvider.post(ApiEndpoints.stockStoreCreate, data: payload);
+      final ok = ApiResponseHandler.handleResponse(response);
+      if (ok) {
+        resetScanner();
+      }
+    } catch (error) {
+      ApiResponseHandler.showErrorSnackbar(error.toString());
+    } finally {
+      isStoring.value = false;
+    }
+  }
 
   @override
   void onInit() {
@@ -134,6 +190,9 @@ class HomeController extends GetxController {
   void onClose() {
     scanQrcodeController.dispose();
     scanCodeController.dispose();
+    storeUuidController.dispose();
+    storeQuantityController.dispose();
+    storeNotesController.dispose();
     super.onClose();
   }
 }

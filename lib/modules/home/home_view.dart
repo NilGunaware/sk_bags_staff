@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/services/permission_service.dart';
 
@@ -374,6 +375,76 @@ class HomeView extends GetView<HomeController> {
                     Expanded(child: _infoTile(Icons.inventory_2_outlined, 'Quantity', data['quantity'])),
                     Expanded(child: _infoTile(Icons.qr_code_scanner, 'Scanned Qty', data['scanned_quantity'])),
                   ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Store',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: controller.storeUuidController,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'UUID',
+                    prefixIcon: const Icon(Icons.fingerprint),
+                    suffixIcon: IconButton(
+                      onPressed: controller.regenerateStoreUuid,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: controller.storeQuantityController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    prefixIcon: Icon(Icons.inventory_2_outlined),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: controller.storeNotesController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes',
+                    prefixIcon: Icon(Icons.notes),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 44,
+                  child: Obx(() => ElevatedButton.icon(
+                    onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: controller.isStoring.value
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
+                  )),
                 ),
               ],
             );

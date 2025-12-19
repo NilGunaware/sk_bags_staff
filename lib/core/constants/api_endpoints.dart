@@ -8,5 +8,6 @@ class ApiEndpoints {
   static const String scanQrcode = '/staff/stock/scan_qrcode';
   static const String stockStoreCreate = '/staff/stock/store/0';
   static const String stockRead = '/staff/stock/read';
+  static const String stockRemove = '/staff/stock/remove';
 }
 

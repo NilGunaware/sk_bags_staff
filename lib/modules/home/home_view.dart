@@ -545,6 +545,12 @@ class HomeView extends GetView<HomeController> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () => _confirmDelete(context, item['id']?.toString() ?? ''),
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                          tooltip: 'Delete',
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -587,6 +593,67 @@ class HomeView extends GetView<HomeController> {
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: const TextStyle(color: Colors.grey, fontSize: 13))),
         ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, String id) {
+    if (id.isEmpty) return;
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.redAccent),
+              const SizedBox(height: 16),
+              const Text(
+                'Delete Item',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.redAccent),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Are you sure you want to delete this item?',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Get.back(),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.back();
+                        controller.deleteStockItem(id);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text('Delete'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

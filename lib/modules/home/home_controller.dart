@@ -77,6 +77,20 @@ class HomeController extends GetxController {
     }
   }
 
+  Future<void> deleteStockItem(String id) async {
+    try {
+      final url = '${ApiEndpoints.stockRemove}/$id';
+      final response = await _apiProvider.delete(url);
+      final ok = ApiResponseHandler.handleResponse(response);
+      if (ok) {
+        // Refresh the list to reflect changes
+        fetchStockList(refresh: true);
+      }
+    } catch (error) {
+      ApiResponseHandler.showErrorSnackbar(error.toString());
+    }
+  }
+
   Future<void> logout() async {
     await authController.clearSession();
     Get.offAllNamed(Routes.login);

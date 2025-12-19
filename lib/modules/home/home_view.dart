@@ -49,12 +49,12 @@ class HomeView extends GetView<HomeController> {
 
         body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context, user),
-              const SizedBox(height: 24),
+
               _buildScannerCard(context),
               const SizedBox(height: 24),
               _buildStockList(context),
@@ -216,7 +216,7 @@ class HomeView extends GetView<HomeController> {
   }
   Widget _buildHeader(BuildContext context, Map<String, dynamic>? user) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
@@ -264,7 +264,7 @@ class HomeView extends GetView<HomeController> {
   Widget _buildScannerCard(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -289,15 +289,42 @@ class HomeView extends GetView<HomeController> {
             ),
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: controller.scanQrcodeController,
-            decoration: InputDecoration(
-              labelText: 'Qrcode',
-              hintText: 'Enter QR value',
-              prefixIcon: const Icon(Icons.qr_code_2),
-              filled: true,
-              fillColor: Colors.white,
-            ),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: SizedBox(
+                  child: TextFormField(
+                    controller: controller.scanQrcodeController,
+                    decoration: InputDecoration(
+                      labelText: 'Qrcode',
+                      hintText: 'Enter QR value',
+                      prefixIcon: const Icon(Icons.qr_code_2),
+                      filled: true,
+                      fillColor: Colors.white,
+                
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 5,),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 55,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openCameraScanner(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                    ),
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('Scan'),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -334,20 +361,8 @@ class HomeView extends GetView<HomeController> {
             )),
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            height: 44,
-            child: OutlinedButton.icon(
-              onPressed: () => _openCameraScanner(),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text('Camera Scan'),
-            ),
-          ),
-          const SizedBox(height: 16),
+
+
           Obx(() {
             final data = controller.scanResult.value;
             if (data == null || data.isEmpty) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../core/services/permission_service.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'home_controller.dart';
@@ -328,6 +330,20 @@ class HomeView extends GetView<HomeController> {
               label: Text(controller.isScanning.value ? 'Scanning...' : 'Scan'),
             )),
           ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: () => _openCameraScanner(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('Camera Scan'),
+            ),
+          ),
           const SizedBox(height: 16),
           Obx(() {
             final data = controller.scanResult.value;
@@ -424,6 +440,63 @@ class HomeView extends GetView<HomeController> {
           ),
         ),
       ),
+    );
+  }
+
+  void _openCameraScanner(BuildContext context) async {
+    final ok = await PermissionService.instance.ensureCameraPermission();
+    if (!ok) return;
+    var handled = false;
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 300,
+                margin: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accent),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: MobileScanner(
+                  fit: BoxFit.cover,
+                  onDetect: (capture) {
+                    if (handled) return;
+                    final barcodes = capture.barcodes;
+                    final value = barcodes.isNotEmpty ? (barcodes.first.rawValue ?? '') : '';
+                    if (value.isEmpty) return;
+                    handled = true;
+                    controller.scanQrcodeController.text = value;
+                    Get.back();
+                    controller.scanItem();
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: TextButton(
+                    onPressed: () => Get.back(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: true,
     );
   }
 

@@ -182,25 +182,35 @@ class LoginView extends GetView<LoginController> {
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: controller.passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: AppStrings.passwordLabel,
-                  prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return AppStrings.passwordRequired;
-                  }
-                  if (value.length < 4) {
-                    return AppStrings.passwordTooShort;
-                  }
-                  return null;
-                },
-              ),
+              Obx(() => TextFormField(
+                    controller: controller.passwordController,
+                    obscureText: controller.isPasswordHidden.value,
+                    decoration: InputDecoration(
+                      labelText: AppStrings.passwordLabel,
+                      prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
+                      suffixIcon: IconButton(
+                        onPressed: controller.togglePasswordVisibility,
+                        icon: Icon(
+                          controller.isPasswordHidden.value
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: colorScheme.primary,
+                        ),
+                        tooltip: controller.isPasswordHidden.value ? 'Show' : 'Hide',
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return AppStrings.passwordRequired;
+                      }
+                      if (value.length < 4) {
+                        return AppStrings.passwordTooShort;
+                      }
+                      return null;
+                    },
+                  )),
               // Align(
               //   alignment: Alignment.centerRight,
               //   child: TextButton(

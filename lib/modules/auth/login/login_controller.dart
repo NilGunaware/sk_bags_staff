@@ -17,6 +17,7 @@ class LoginController extends GetxController {
   final mobileController = TextEditingController();
   final passwordController = TextEditingController();
   final isLoading = false.obs;
+  final isPasswordHidden = true.obs;
 
   AuthController get _authController => Get.find<AuthController>();
   AuthService get _authService => Get.find<AuthService>();
@@ -26,6 +27,10 @@ class LoginController extends GetxController {
     mobileController.dispose();
     passwordController.dispose();
     super.onClose();
+  }
+  
+  void togglePasswordVisibility() {
+    isPasswordHidden.value = !isPasswordHidden.value;
   }
 
   Future<void> submit() async {

@@ -294,17 +294,27 @@ class HomeView extends GetView<HomeController> {
               Expanded(
                 flex: 3,
                 child: SizedBox(
-                  child: TextFormField(
-                    controller: controller.scanQrcodeController,
+                  child:   TextFormField(
+                    controller: controller.scanCodeController,
                     decoration: InputDecoration(
-                      labelText: 'Qrcode',
-                      hintText: 'Enter QR value',
-                      prefixIcon: const Icon(Icons.qr_code_2),
+                      labelText: 'Code',
+                      hintText: 'Enter item code',
+                      prefixIcon: const Icon(Icons.numbers),
                       filled: true,
                       fillColor: Colors.white,
-                
                     ),
                   ),
+                  // TextFormField(
+                  //   controller: controller.scanQrcodeController,
+                  //   decoration: InputDecoration(
+                  //     labelText: 'Qrcode',
+                  //     hintText: 'Enter QR value',
+                  //     prefixIcon: const Icon(Icons.qr_code_2),
+                  //     filled: true,
+                  //     fillColor: Colors.white,
+                  //
+                  //   ),
+                  // ),
                 ),
               ),
               SizedBox(width: 5,),
@@ -319,7 +329,7 @@ class HomeView extends GetView<HomeController> {
                       side: const BorderSide(color: AppColors.primary),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                     ),
-                    icon: const Icon(Icons.camera_alt_outlined),
+                    icon: const Icon(Icons.qr_code_scanner),
                     label: const Text('Scan'),
                   ),
                 ),
@@ -327,17 +337,17 @@ class HomeView extends GetView<HomeController> {
             ],
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: controller.scanCodeController,
-            decoration: InputDecoration(
-              labelText: 'Code',
-              hintText: 'Enter item code',
-              prefixIcon: const Icon(Icons.numbers),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 12),
+          // TextFormField(
+          //   controller: controller.scanCodeController,
+          //   decoration: InputDecoration(
+          //     labelText: 'Code',
+          //     hintText: 'Enter item code',
+          //     prefixIcon: const Icon(Icons.numbers),
+          //     filled: true,
+          //     fillColor: Colors.white,
+          //   ),
+          // ),
+          // const SizedBox(height: 12),
           SizedBox(
             height: 48,
             child: Obx(() => ElevatedButton.icon(
@@ -357,7 +367,7 @@ class HomeView extends GetView<HomeController> {
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
                   : const Icon(Icons.qr_code_scanner),
-              label: Text(controller.isScanning.value ? 'Scanning...' : 'Scan'),
+              label: Text(controller.isScanning.value ? 'Scanning...' : 'Submit'),
             )),
           ),
           const SizedBox(height: 8),

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../constants/app_strings.dart';
 import '../constants/app_colors.dart';
 
 class ApiException implements Exception {
@@ -28,18 +27,16 @@ class ApiResponseHandler {
     try {
       final Map<String, dynamic> responseData = _asMap(response);
       final bool status = responseData['status'] == true;
-      final String message = responseData['message']?.toString() ??
-        //  responseData['msg']?.toString() ??
-      //    responseData['error']?.toString() ??
-          '';
+      final String message = responseData['message']?.toString().trim() ?? '';
 
       if (!status) {
-        final resolvedMessage = message;
-        _showMessage(resolvedMessage, isSuccess: false);
-        throw ApiException(resolvedMessage);
+        if (message.isNotEmpty) {
+          _showMessage(message, isSuccess: false);
+        }
+        throw ApiException(message);
       }
 
-      if (message.isNotEmpty && showSuccessMessage) {
+      if (showSuccessMessage && message.isNotEmpty) {
         _showMessage(message, isSuccess: true);
       }
 
@@ -68,7 +65,8 @@ class ApiResponseHandler {
       _showMessage(message, isSuccess: false);
 
   static void _showMessage(String message, {required bool isSuccess}) {
-    final trimmed = message.trim().isEmpty ? message : message;
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) return;
     if (!_shouldShowMessage(trimmed)) return;
     _recordMessage(trimmed);
 

@@ -67,11 +67,11 @@ class ApiProvider {
     if (response.statusCode >= 400) {
       final message = _extractMessage(response.body);
 
-      final errorMsg = message.isNotEmpty 
-          ? message 
-          : 'Request failed (${response.statusCode})';
-          //Print('API Error: ${response.statusCode} - ${response.body}');
-      throw Exception(errorMsg);
+      // final errorMsg = message.isNotEmpty
+      //     ? message
+      //     : 'Request failed (${response.statusCode})';
+      //     //Print('API Error: ${response.statusCode} - ${response.body}');
+      // throw Exception(errorMsg);
     }
 
     if (response.body.isEmpty) {

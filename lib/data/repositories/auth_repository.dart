@@ -10,12 +10,13 @@ class AuthRepository {
   Future<LoginResponse> login({
     required String mobileNumber,
     required String password,
-    String expiryIn = '84600',
+    //String expiryIn = '84600',
+    String expiryIn = '60',
   }) async {
     final payload = {
       'mobile_no': mobileNumber,
       'password': password,
-      'expiry_in': expiryIn,
+      'expiry_time': expiryIn,
     };
 
     final response =

@@ -1,4 +1,6 @@
 import 'package:get/get.dart';
+import 'package:flutter/foundation.dart';
+import '../../core/services/auth_service.dart';
 
 import '../../routes/app_routes.dart';
 import '../auth/controllers/auth_controller.dart';
@@ -14,6 +16,9 @@ class SplashController extends GetxController {
 
   Future<void> _navigate() async {
     await _authController.hydrateSession();
+    if (kDebugMode && Get.isRegistered<AuthService>()) {
+      await Get.find<AuthService>().refreshToken();
+    }
     await Future.delayed(const Duration(milliseconds: 1200));
     if (_authController.isLoggedIn.isTrue) {
       Get.offAllNamed(Routes.home);

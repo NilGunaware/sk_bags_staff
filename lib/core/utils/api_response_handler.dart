@@ -29,13 +29,12 @@ class ApiResponseHandler {
       final Map<String, dynamic> responseData = _asMap(response);
       final bool status = responseData['status'] == true;
       final String message = responseData['message']?.toString() ??
-          responseData['msg']?.toString() ??
-          responseData['error']?.toString() ??
+        //  responseData['msg']?.toString() ??
+      //    responseData['error']?.toString() ??
           '';
 
       if (!status) {
-        final resolvedMessage =
-            message.isEmpty ? AppStrings.defaultError : message;
+        final resolvedMessage = message;
         _showMessage(resolvedMessage, isSuccess: false);
         throw ApiException(resolvedMessage);
       }
@@ -48,7 +47,7 @@ class ApiResponseHandler {
     } on ApiException {
       rethrow;
     } catch (_) {
-      _showMessage(AppStrings.defaultError, isSuccess: false);
+     // _showMessage(AppStrings.defaultError, isSuccess: false);
       return false;
     }
   }
@@ -69,7 +68,7 @@ class ApiResponseHandler {
       _showMessage(message, isSuccess: false);
 
   static void _showMessage(String message, {required bool isSuccess}) {
-    final trimmed = message.trim().isEmpty ? AppStrings.defaultError : message;
+    final trimmed = message.trim().isEmpty ? message : message;
     if (!_shouldShowMessage(trimmed)) return;
     _recordMessage(trimmed);
 

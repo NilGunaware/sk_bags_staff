@@ -13,10 +13,8 @@ class AppStrings {
   static const String passwordTooShort =
       'Password must be at least 4 characters';
   static const String defaultError = 'Something went wrong. Please try again.';
-
-
-
-
+  static const String branchLabel = 'Branch';
+  static const String branchRequired = 'Please select a branch';
 
 
 

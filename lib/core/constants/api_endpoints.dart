@@ -3,6 +3,7 @@ class ApiEndpoints {
   static const String login = '/staff/auth/login';
   static const String refreshToken = '/staff/auth/refresh_token';
   static const String apiAccessKey = 'ZkC6BDUzxz';
+  static const String managerBranchRead = '/manager/master/branch/read';
 
   static const String getProfile = '/staff/auth/get_profile';
   static const String scanQrcode = '/staff/stock/scan_qrcode';

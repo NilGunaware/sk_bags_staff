@@ -182,6 +182,37 @@ class LoginView extends GetView<LoginController> {
                 },
               ),
               const SizedBox(height: 16),
+              Obx(() {
+                final items = controller.branches;
+                return DropdownButtonFormField<String>(
+                  value: controller.selectedBranchId.value?.isEmpty == true
+                      ? null
+                      : controller.selectedBranchId.value,
+                  items: items
+                      .map((b) => DropdownMenuItem<String>(
+                            value: b['id'] as String,
+                            child: Text(b['name'] as String),
+                          ))
+                      .toList(),
+                  onChanged: controller.isBranchLoading.value
+                      ? null
+                      : (val) => controller.selectedBranchId.value = val,
+                  decoration: InputDecoration(
+                    labelText: 'Branch',
+                    prefixIcon:
+                        Icon(Icons.account_tree_outlined, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select a branch';
+                    }
+                    return null;
+                  },
+                );
+              }),
+              const SizedBox(height: 16),
               Obx(() => TextFormField(
                     controller: controller.passwordController,
                     obscureText: controller.isPasswordHidden.value,

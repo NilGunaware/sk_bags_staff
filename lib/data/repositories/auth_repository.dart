@@ -10,14 +10,18 @@ class AuthRepository {
   Future<LoginResponse> login({
     required String mobileNumber,
     required String password,
-    //String expiryIn = '84600',
-    String expiryIn = '60',
+    String expiryIn = '84600',
+    //String expiryIn = '60',
+    String? branchId,
   }) async {
     final payload = {
       'mobile_no': mobileNumber,
       'password': password,
       'expiry_time': expiryIn,
     };
+    if (branchId != null && branchId.isNotEmpty) {
+      payload['branch_id'] = branchId;
+    }
 
     final response =
         await _apiProvider.post(ApiEndpoints.login, data: payload);

@@ -8,19 +8,31 @@ import '../../../data/models/login_response.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../controllers/auth_controller.dart';
 import '../../../routes/app_routes.dart';
+import '../../../data/providers/api_provider.dart';
+import '../../../core/constants/api_endpoints.dart';
 
 class LoginController extends GetxController {
   LoginController(this._authRepository);
 
   final AuthRepository _authRepository;
+  final ApiProvider _apiProvider = Get.find<ApiProvider>();
   final formKey = GlobalKey<FormState>();
   final mobileController = TextEditingController();
   final passwordController = TextEditingController();
   final isLoading = false.obs;
   final isPasswordHidden = true.obs;
+  final isBranchLoading = false.obs;
+  final branches = <Map<String, dynamic>>[].obs;
+  final selectedBranchId = RxnString();
 
   AuthController get _authController => Get.find<AuthController>();
   AuthService get _authService => Get.find<AuthService>();
+
+  @override
+  void onInit() {
+    super.onInit();
+    fetchBranches();
+  }
 
   @override
   void onClose() {
@@ -35,17 +47,50 @@ class LoginController extends GetxController {
 
   Future<void> submit() async {
     if (!(formKey.currentState?.validate() ?? false)) return;
+    if (selectedBranchId.value == null || selectedBranchId.value!.isEmpty) {
+      ApiResponseHandler.showErrorSnackbar('Please select a branch');
+      return;
+    }
     isLoading.value = true;
     try {
       final response = await _authRepository.login(
         mobileNumber: mobileController.text.trim(),
         password: passwordController.text,
+        branchId: selectedBranchId.value,
       );
       await _handleLoginResponse(response);
     } catch (error) {
       ApiResponseHandler.showErrorSnackbar(error.toString());
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> fetchBranches() async {
+    isBranchLoading.value = true;
+    try {
+      final payload = {
+        'offset': 0,
+        'search': {
+          'id': '',
+          'name': '',
+        }
+      };
+      final response = await _apiProvider.post(ApiEndpoints.managerBranchRead, data: payload);
+      final ok = ApiResponseHandler.handleResponse(response, showSuccessMessage: false);
+      if (!ok) return;
+      final data = response['data'] as Map<String, dynamic>?;
+      final records = (data?['record'] as List?) ?? [];
+      branches.assignAll(
+        records.whereType<Map<String, dynamic>>().map((e) => {
+          'id': e['id']?.toString() ?? '',
+          'name': e['name']?.toString() ?? '',
+        }),
+      );
+    } catch (error) {
+      ApiResponseHandler.showErrorSnackbar(error.toString());
+    } finally {
+      isBranchLoading.value = false;
     }
   }
 

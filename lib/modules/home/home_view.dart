@@ -348,27 +348,73 @@ class HomeView extends GetView<HomeController> {
           //   ),
           // ),
           // const SizedBox(height: 12),
+          TextFormField(
+            controller: controller.storeQuantityController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(
+              labelText: 'Quantity',
+              prefixIcon: Icon(Icons.inventory_2_outlined),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          ),
+          SizedBox(height: 9,),
           SizedBox(
-            height: 48,
-            child: Obx(() => ElevatedButton.icon(
-              onPressed: controller.isScanning.value ? null : controller.scanItem,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            height: 60,
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 55,
+                    child: Obx(() => ElevatedButton.icon(
+                      onPressed: controller.isScanning.value ? null : controller.scanItem,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: controller.isScanning.value
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.qr_code_scanner),
+                      label: Text(controller.isScanning.value ? 'Scanning...' : 'Scan'),
+                    )),
+                  ),
                 ),
-              ),
-              icon: controller.isScanning.value
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Icon(Icons.qr_code_scanner),
-              label: Text(controller.isScanning.value ? 'Scanning...' : 'Submit'),
-            )),
+                SizedBox(width: 5,),
+                Expanded(
+                  child: SizedBox(
+                    height: 55,
+                    child: Obx(() => ElevatedButton.icon(
+                      onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: controller.isStoring.value
+                          ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                          : const Icon(Icons.save_outlined),
+                      label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
+                    )),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
 
@@ -382,7 +428,92 @@ class HomeView extends GetView<HomeController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Divider(),
+
+                const Text(
+                  'Store',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+
+                // TextFormField(
+                //   controller: controller.storeUuidController,
+                //   readOnly: true,
+                //   decoration: InputDecoration(
+                //     labelText: 'UUID',
+                //     prefixIcon: const Icon(Icons.fingerprint),
+                //     suffixIcon: IconButton(
+                //       onPressed: controller.regenerateStoreUuid,
+                //       icon: const Icon(Icons.refresh),
+                //     ),
+                //     filled: true,
+                //     fillColor: Colors.white,
+                //   ),
+                // ),
+                // const SizedBox(height: 8),
+
                 const SizedBox(height: 8),
+                TextFormField(
+                  controller: controller.storeNotesController,
+                  maxLines: 1,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes',
+                    prefixIcon: Icon(Icons.notes),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // SizedBox(
+                //   child: Row(
+                //     children: [
+                //       Expanded(
+                //         flex:3,
+                //         child: TextFormField(
+                //           controller: controller.storeQuantityController,
+                //           keyboardType: TextInputType.number,
+                //           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                //           decoration: const InputDecoration(
+                //             labelText: 'Quantity',
+                //             prefixIcon: Icon(Icons.inventory_2_outlined),
+                //             filled: true,
+                //             fillColor: Colors.white,
+                //           ),
+                //         ),
+                //       ),
+                //       SizedBox(width: 10,),
+                //       Expanded(
+                //         flex: 2,
+                //         child: SizedBox(
+                //           height: 55,
+                //           child: Obx(() => ElevatedButton.icon(
+                //             onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
+                //             style: ElevatedButton.styleFrom(
+                //               backgroundColor: AppColors.primary,
+                //               foregroundColor: Colors.white,
+                //               elevation: 0,
+                //               shape: RoundedRectangleBorder(
+                //                 borderRadius: BorderRadius.circular(12),
+                //               ),
+                //             ),
+                //             icon: controller.isStoring.value
+                //                 ? const SizedBox(
+                //               width: 20,
+                //               height: 20,
+                //               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                //             )
+                //                 : const Icon(Icons.save_outlined),
+                //             label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
+                //           )),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
+                // const SizedBox(height: 8),
+
                 const Text(
                   'Result',
                   style: TextStyle(
@@ -403,76 +534,7 @@ class HomeView extends GetView<HomeController> {
                     Expanded(child: _infoTile(Icons.qr_code_scanner, 'Scanned Qty', data['scanned_quantity'])),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Store',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // TextFormField(
-                //   controller: controller.storeUuidController,
-                //   readOnly: true,
-                //   decoration: InputDecoration(
-                //     labelText: 'UUID',
-                //     prefixIcon: const Icon(Icons.fingerprint),
-                //     suffixIcon: IconButton(
-                //       onPressed: controller.regenerateStoreUuid,
-                //       icon: const Icon(Icons.refresh),
-                //     ),
-                //     filled: true,
-                //     fillColor: Colors.white,
-                //   ),
-                // ),
-                // const SizedBox(height: 8),
-                TextFormField(
-                  controller: controller.storeQuantityController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Quantity',
-                    prefixIcon: Icon(Icons.inventory_2_outlined),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: controller.storeNotesController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes',
-                    prefixIcon: Icon(Icons.notes),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 44,
-                  child: Obx(() => ElevatedButton.icon(
-                    onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: controller.isStoring.value
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save_outlined),
-                    label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
-                  )),
-                ),
+
               ],
             );
           }),

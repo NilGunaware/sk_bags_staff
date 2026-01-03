@@ -147,7 +147,7 @@ class HomeView extends GetView<HomeController> {
                                       _infoTile(Icons.admin_panel_settings_outlined, 'Role ID', data?['role_id']),
                                       _infoTile(Icons.store_outlined, 'Branch ID', data?['branch_id']),
                                       _infoTile(Icons.calendar_today_outlined, 'Financial Year', data?['financial_year']),
-                                      _infoTile(Icons.timer_outlined, 'Expiry Time (sec)', data?['expiry_time']),
+                                     // _infoTile(Icons.timer_outlined, 'Expiry Time (sec)', data?['expiry_time']),
                                       _infoTile(Icons.event, 'Created At', _formatEpoch(data?['created_at'])),
                                       _linkTile(Icons.link, 'Issuer', data?['iss']),
                                     ],
@@ -394,7 +394,7 @@ class HomeView extends GetView<HomeController> {
                 const SizedBox(height: 8),
                 _infoTile(Icons.sell_outlined, 'Item Code', data['item_code']),
                 _infoTile(Icons.label_important_outline, 'Item Name', data['item_name']),
-                _infoTile(Icons.qr_code_2, 'Item Qrcode', data['item_qrcode']),
+               // _infoTile(Icons.qr_code_2, 'Item Qrcode', data['item_qrcode']),
                 _infoTile(Icons.category_outlined, 'Group', data['group_name']),
                 _infoTile(Icons.home_work_outlined, 'Company', data['company_name']),
                 Row(
@@ -413,21 +413,21 @@ class HomeView extends GetView<HomeController> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: controller.storeUuidController,
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'UUID',
-                    prefixIcon: const Icon(Icons.fingerprint),
-                    suffixIcon: IconButton(
-                      onPressed: controller.regenerateStoreUuid,
-                      icon: const Icon(Icons.refresh),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                // TextFormField(
+                //   controller: controller.storeUuidController,
+                //   readOnly: true,
+                //   decoration: InputDecoration(
+                //     labelText: 'UUID',
+                //     prefixIcon: const Icon(Icons.fingerprint),
+                //     suffixIcon: IconButton(
+                //       onPressed: controller.regenerateStoreUuid,
+                //       icon: const Icon(Icons.refresh),
+                //     ),
+                //     filled: true,
+                //     fillColor: Colors.white,
+                //   ),
+                // ),
+                // const SizedBox(height: 8),
                 TextFormField(
                   controller: controller.storeQuantityController,
                   keyboardType: TextInputType.number,

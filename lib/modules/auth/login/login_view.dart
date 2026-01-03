@@ -191,7 +191,7 @@ class LoginView extends GetView<LoginController> {
                   items: items
                       .map((b) => DropdownMenuItem<String>(
                             value: b['id'] as String,
-                            child: Text(b['name'] as String),
+                            child: Text(b['name'] as String,style: TextStyle(fontSize: 13),),
                           ))
                       .toList(),
                   onChanged: controller.isBranchLoading.value

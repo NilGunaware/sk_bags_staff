@@ -348,17 +348,24 @@ class HomeView extends GetView<HomeController> {
           //   ),
           // ),
           // const SizedBox(height: 12),
-          TextFormField(
-            controller: controller.storeQuantityController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText: 'Quantity',
-              prefixIcon: Icon(Icons.inventory_2_outlined),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-          ),
+          Obx(() {
+            final data = controller.scanResult.value;
+            if (data == null || data.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return    TextFormField(
+              controller: controller.storeQuantityController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'Quantity',
+                prefixIcon: Icon(Icons.inventory_2_outlined),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            );
+          }),
+
           SizedBox(height: 9,),
           SizedBox(
             height: 60,
@@ -389,30 +396,37 @@ class HomeView extends GetView<HomeController> {
                   ),
                 ),
                 SizedBox(width: 5,),
-                Expanded(
-                  child: SizedBox(
-                    height: 55,
-                    child: Obx(() => ElevatedButton.icon(
-                      onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                Obx(() {
+                  final data = controller.scanResult.value;
+                  if (data == null || data.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return   Expanded(
+                    child: SizedBox(
+                      height: 55,
+                      child: Obx(() => ElevatedButton.icon(
+                        onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      icon: controller.isStoring.value
-                          ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                          : const Icon(Icons.save_outlined),
-                      label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
-                    )),
-                  ),
-                ),
+                        icon: controller.isStoring.value
+                            ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                            : const Icon(Icons.save_outlined),
+                        label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
+                      )),
+                    ),
+                  );
+                }),
+
               ],
             ),
           ),

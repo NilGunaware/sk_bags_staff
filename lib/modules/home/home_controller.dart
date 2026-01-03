@@ -129,7 +129,9 @@ class HomeController extends GetxController {
         'qrcode': scanQrcodeController.text.trim(),
         'code': scanCodeController.text.trim(),
       };
+      print('Scan Payload: $payload');
       final response = await _apiProvider.post(ApiEndpoints.scanQrcode, data: payload);
+      print('Scan Response: $response');
       final ok = ApiResponseHandler.handleResponse(response);
       if (ok) {
         final data = response['data'] is Map<String, dynamic>
@@ -138,6 +140,7 @@ class HomeController extends GetxController {
         scanResult.value = data;
       }
     } catch (error) {
+      print('Scan Error: $error');
       ApiResponseHandler.showErrorSnackbar(error.toString());
     } finally {
       isScanning.value = false;

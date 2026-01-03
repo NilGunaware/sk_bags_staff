@@ -888,7 +888,7 @@ class HomeView extends GetView<HomeController> {
                     final value = barcodes.isNotEmpty ? (barcodes.first.rawValue ?? '') : '';
                     if (value.isEmpty) return;
                     handled = true;
-                    controller.scanQrcodeController.text = value;
+                    controller.scanCodeController.text = value;
                     Get.back();
                     controller.scanItem();
                   },

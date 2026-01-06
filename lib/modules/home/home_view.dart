@@ -426,6 +426,52 @@ class HomeView extends GetView<HomeController> {
                     ),
                   );
                 }),
+                SizedBox(width: 5,),
+                Obx(() {
+                  final data = controller.scanResult.value;
+                  if (data == null || data.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return   Expanded(
+                    child:    SizedBox(
+                      height: 55,
+                      child: ElevatedButton.icon(
+                        onPressed: controller.resetScanner,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: controller.isStoring.value
+                            ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                            : const Icon(Icons.clear),
+                        label: const Text('Clear'),
+                      ),
+                    )
+
+
+
+                    // TextButton.icon(
+                    //
+                    //   onPressed: controller.resetScanner,
+                    //   icon: const Icon(Icons.close, size: 16),
+                    //   label: const Text('Clear'),
+                    //   style: TextButton.styleFrom(
+                    //     foregroundColor: Colors.redAccent,
+                    //     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    //     minimumSize: Size.zero,
+                    //     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    //   ),
+                    // ),
+                  );
+                }),
 
               ],
             ),
@@ -528,13 +574,20 @@ class HomeView extends GetView<HomeController> {
                 // ),
                 // const SizedBox(height: 8),
 
-                const Text(
-                  'Result',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Result',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+
+                  ],
                 ),
                 const SizedBox(height: 8),
                 _infoTile(Icons.sell_outlined, 'Item Code', data['item_code']),

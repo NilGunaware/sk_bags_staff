@@ -214,6 +214,7 @@ class HomeController extends GetxController {
       return;
     }
     final itemId = current['item_id']?.toString() ?? '';
+    final itemCode = current['item_code']?.toString() ?? '';
     if (itemId.isEmpty) {
       ApiResponseHandler.showErrorSnackbar('Invalid item');
       return;
@@ -231,16 +232,20 @@ class HomeController extends GetxController {
             ? '${DateTime.now().millisecondsSinceEpoch}'
             : storeUuidController.text.trim(),
         'item_id': itemId,
+        'item_code': itemCode,
         'quantity': qtyStr,
         'notes': storeNotesController.text.trim(),
       };
+      print('Store Payload: $payload');
       final response = await _apiProvider.post(ApiEndpoints.stockStoreCreate, data: payload);
+      print('Store Response: $response');
       final ok = ApiResponseHandler.handleResponse(response);
       if (ok) {
         resetScanner();
         fetchStockList(refresh: true);
       }
     } catch (error) {
+      print('Store Error: $error');
       ApiResponseHandler.showErrorSnackbar(error.toString());
     } finally {
       isStoring.value = false;

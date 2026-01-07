@@ -281,7 +281,7 @@ class HomeView extends GetView<HomeController> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Scan QR/Barcode',
+            'Scan QR with Camera',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -289,6 +289,56 @@ class HomeView extends GetView<HomeController> {
             ),
           ),
           const SizedBox(height: 12),
+          SizedBox(
+            height: 55,
+            child: OutlinedButton.icon(
+              onPressed: () => _openCameraScanner(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+              ),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scan'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Divider(
+                  color: Colors.grey,
+                  thickness: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'OR',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Divider(
+                  color: Colors.grey,
+                  thickness: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Enter Code Manually',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
@@ -317,23 +367,8 @@ class HomeView extends GetView<HomeController> {
                   // ),
                 ),
               ),
-              SizedBox(width: 5,),
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 55,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openCameraScanner(),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                    ),
-                    icon: const Icon(Icons.qr_code_scanner),
-                    label: const Text('Scan'),
-                  ),
-                ),
-              ),
+
+
             ],
           ),
           const SizedBox(height: 12),
@@ -367,7 +402,7 @@ class HomeView extends GetView<HomeController> {
             );
           }),
 
-          SizedBox(height: 9,),
+
           SizedBox(
             height: 60,
             child: Row(
@@ -392,7 +427,7 @@ class HomeView extends GetView<HomeController> {
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
                           : const Icon(Icons.qr_code_scanner),
-                      label: Text(controller.isScanning.value ? 'Scanning...' : 'Scan'),
+                      label: Text(controller.isScanning.value ? 'Scanning...' : 'Enter'),
                     )),
                   ),
                 ),

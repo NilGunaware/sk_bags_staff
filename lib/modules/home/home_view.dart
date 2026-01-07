@@ -350,10 +350,11 @@ class HomeView extends GetView<HomeController> {
           // const SizedBox(height: 12),
           Obx(() {
             final data = controller.scanResult.value;
-            if (data == null || data.isEmpty) {
+            final showForm = controller.showStoreForm.value;
+            if (!showForm || data == null || data.isEmpty) {
               return const SizedBox.shrink();
             }
-            return    TextFormField(
+            return TextFormField(
               controller: controller.storeQuantityController,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -375,7 +376,7 @@ class HomeView extends GetView<HomeController> {
                   child: SizedBox(
                     height: 55,
                     child: Obx(() => ElevatedButton.icon(
-                      onPressed: controller.isScanning.value ? null : controller.scanItem,
+                      onPressed: controller.isScanning.value ? null : controller.scanItemCode,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -1019,7 +1020,7 @@ class HomeView extends GetView<HomeController> {
                     handled = true;
                     controller.scanCodeController.text = value;
                     Get.back();
-                    controller.scanItem();
+                    controller.scanItemCamera();
                   },
                 ),
               ),

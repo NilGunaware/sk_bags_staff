@@ -24,6 +24,7 @@ class HomeController extends GetxController {
   final scanQrcodeController = TextEditingController();
   final scanCodeController = TextEditingController();
   final isStoring = false.obs;
+  final showStoreForm = false.obs;
   final storeUuidController = TextEditingController(text: '${DateTime.now().millisecondsSinceEpoch}');
   final storeQuantityController = TextEditingController(text: '1');
   final storeNotesController = TextEditingController();
@@ -122,7 +123,7 @@ class HomeController extends GetxController {
     }
   }
   
-  Future<void> scanItem() async {
+  Future<void> scanItem({bool viaCamera = false}) async {
     isScanning.value = true;
     try {
       final payload = {
@@ -138,6 +139,10 @@ class HomeController extends GetxController {
             ? Map<String, dynamic>.from(response['data'] as Map)
             : <String, dynamic>{};
         scanResult.value = data;
+        showStoreForm.value = !viaCamera;
+        if (viaCamera) {
+          storeQuantityController.text = '1';
+        }
       }
     } catch (error) {
       print('Scan Error: $error');
@@ -146,6 +151,9 @@ class HomeController extends GetxController {
       isScanning.value = false;
     }
   }
+  
+  Future<void> scanItemCode() => scanItem(viaCamera: false);
+  Future<void> scanItemCamera() => scanItem(viaCamera: true);
 
   Future<void> copyToClipboard(String text) async {
     try {
@@ -202,12 +210,13 @@ class HomeController extends GetxController {
     scanQrcodeController.clear();
     scanCodeController.clear();
     scanResult.value = null;
+    showStoreForm.value = false;
     regenerateStoreUuid();
     storeQuantityController.text = '1';
     storeNotesController.clear();
   }
   
-  Future<void> storeScannedItem() async {
+  Future<void> storeScannedItem({bool resetAfter = true}) async {
     final current = scanResult.value;
     if (current == null) {
       ApiResponseHandler.showErrorSnackbar('Scan an item first');
@@ -241,7 +250,9 @@ class HomeController extends GetxController {
       print('Store Response: $response');
       final ok = ApiResponseHandler.handleResponse(response);
       if (ok) {
-        resetScanner();
+        if (resetAfter) {
+          resetScanner();
+        }
         fetchStockList(refresh: true);
       }
     } catch (error) {

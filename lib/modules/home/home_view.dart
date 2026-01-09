@@ -343,30 +343,56 @@ class HomeView extends GetView<HomeController> {
             children: [
               Expanded(
                 flex: 3,
-                child: SizedBox(
-                  child:   TextFormField(
-                    controller: controller.scanCodeController,
-                    decoration: InputDecoration(
-                      labelText: 'Code',
-                      hintText: 'Enter item code',
-                      prefixIcon: const Icon(Icons.numbers),
-                      filled: true,
-                      fillColor: Colors.white,
+                child: TextFormField(
+                  controller: controller.scanCodeController,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'Code',
+                    hintText: 'Enter item code',
+                    prefixIcon: const Icon(Icons.numbers),
+
+                    // ✅ Correct suffix
+                    suffixIcon: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: ElevatedButton(
+                          onPressed: controller.isStoring.value
+                              ? null
+                              : controller.resetScanner,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: controller.isStoring.value
+                              ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                              : const Icon(Icons.clear, size: 18),
+                        ),
+                      ),
+                    ),
+
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  // TextFormField(
-                  //   controller: controller.scanQrcodeController,
-                  //   decoration: InputDecoration(
-                  //     labelText: 'Qrcode',
-                  //     hintText: 'Enter QR value',
-                  //     prefixIcon: const Icon(Icons.qr_code_2),
-                  //     filled: true,
-                  //     fillColor: Colors.white,
-                  //
-                  //   ),
-                  // ),
                 ),
               ),
+
 
 
             ],
@@ -386,9 +412,12 @@ class HomeView extends GetView<HomeController> {
           Obx(() {
             final data = controller.scanResult.value;
             final showForm = controller.showStoreForm.value;
-            if (!showForm || data == null || data.isEmpty) {
+            
+            // Hide ONLY if we have scan results AND it was a camera scan (showForm is false)
+            if (data != null && data.isNotEmpty && !showForm) {
               return const SizedBox.shrink();
             }
+
             return TextFormField(
               controller: controller.storeQuantityController,
               keyboardType: TextInputType.number,
@@ -402,115 +431,98 @@ class HomeView extends GetView<HomeController> {
             );
           }),
 
-
+SizedBox(height: 10,),
           SizedBox(
             height: 60,
-            child: Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 55,
-                    child: Obx(() => ElevatedButton.icon(
-                      onPressed: controller.isScanning.value ? null : controller.scanItemCode,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+            child: Obx(() {
+              final data = controller.scanResult.value;
+              final hasResult = data != null && data.isNotEmpty;
+
+              if (!hasResult) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 55,
+                        child: ElevatedButton.icon(
+                          onPressed: controller.isScanning.value ? null : controller.scanItemCode,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: controller.isScanning.value
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Icon(Icons.qr_code_scanner),
+                          label: Text(controller.isScanning.value ? 'Scanning...' : 'Enter'),
                         ),
                       ),
-                      icon: controller.isScanning.value
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Icon(Icons.qr_code_scanner),
-                      label: Text(controller.isScanning.value ? 'Scanning...' : 'Enter'),
-                    )),
-                  ),
-                ),
-                SizedBox(width: 5,),
-                Obx(() {
-                  final data = controller.scanResult.value;
-                  if (data == null || data.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return   Expanded(
-                    child: SizedBox(
-                      height: 55,
-                      child: Obx(() => ElevatedButton.icon(
-                        onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: controller.isStoring.value
-                            ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                            : const Icon(Icons.save_outlined),
-                        label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
-                      )),
                     ),
-                  );
-                }),
-                SizedBox(width: 5,),
-                Obx(() {
-                  final data = controller.scanResult.value;
-                  if (data == null || data.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return   Expanded(
-                    child:    SizedBox(
-                      height: 55,
-                      child: ElevatedButton.icon(
-                        onPressed: controller.resetScanner,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 55,
+                        child: ElevatedButton.icon(
+                          onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
+                          icon: controller.isStoring.value
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Icon(Icons.save_outlined),
+                          label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
                         ),
-                        icon: controller.isStoring.value
-                            ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                            : const Icon(Icons.clear),
-                        label: const Text('Clear'),
                       ),
-                    )
-
-
-
-                    // TextButton.icon(
-                    //
-                    //   onPressed: controller.resetScanner,
-                    //   icon: const Icon(Icons.close, size: 16),
-                    //   label: const Text('Clear'),
-                    //   style: TextButton.styleFrom(
-                    //     foregroundColor: Colors.redAccent,
-                    //     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    //     minimumSize: Size.zero,
-                    //     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    // const SizedBox(width: 5),
+                    // Expanded(
+                    //   child: SizedBox(
+                    //     height: 55,
+                    //     child: ElevatedButton.icon(
+                    //       onPressed: controller.resetScanner,
+                    //       style: ElevatedButton.styleFrom(
+                    //         backgroundColor: Colors.red,
+                    //         foregroundColor: Colors.white,
+                    //         elevation: 0,
+                    //         shape: RoundedRectangleBorder(
+                    //           borderRadius: BorderRadius.circular(12),
+                    //         ),
+                    //       ),
+                    //       icon: controller.isStoring.value
+                    //           ? const SizedBox(
+                    //               width: 20,
+                    //               height: 20,
+                    //               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    //             )
+                    //           : const Icon(Icons.clear),
+                    //       label: const Text('Clear'),
+                    //     ),
                     //   ),
                     // ),
-                  );
-                }),
-
-              ],
-            ),
+                  ],
+                );
+              }
+            }),
           ),
           const SizedBox(height: 8),
 

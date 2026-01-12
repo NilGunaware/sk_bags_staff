@@ -89,14 +89,64 @@ class HomeController extends GetxController {
     await deleteStockItem(id);
   }
 
+  Future<void> storeItemEnsureScan() async {
+    final qtyStr = storeQuantityController.text.trim();
+    final qty = int.tryParse(qtyStr) ?? 0;
+    if (qty <= 0) {
+      ApiResponseHandler.showErrorSnackbar('Enter a valid quantity');
+      return;
+    }
+    isStoring.value = true;
+    try {
+      if (scanResult.value == null || scanResult.value!.isEmpty) {
+        final payload = {
+          'qrcode': scanQrcodeController.text.trim(),
+          'code': scanCodeController.text.trim(),
+        };
+        final response = await _apiProvider.post(ApiEndpoints.scanQrcode, data: payload);
+        final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true);
+        if (!ok) return;
+        final data = response['data'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(response['data'] as Map)
+            : <String, dynamic>{};
+        scanResult.value = data;
+        showStoreForm.value = true;
+      }
+      final current = scanResult.value;
+      final itemId = current?['item_id']?.toString() ?? '';
+      final itemCode = current?['item_code']?.toString() ?? '';
+      if (itemId.isEmpty) {
+        ApiResponseHandler.showErrorSnackbar('Invalid item');
+        return;
+      }
+      final payloadStore = {
+        'uuid': storeUuidController.text.trim().isEmpty
+            ? '${DateTime.now().millisecondsSinceEpoch}'
+            : storeUuidController.text.trim(),
+        'item_id': itemId,
+        'item_code': itemCode,
+        'quantity': qtyStr,
+        'notes': storeNotesController.text.trim(),
+      };
+      final responseStore = await _apiProvider.post(ApiEndpoints.stockStoreCreate, data: payloadStore);
+      final okStore = ApiResponseHandler.handleResponse(responseStore, showErrorMessage: true);
+      if (okStore) {
+        resetScanner();
+        fetchStockList(refresh: true);
+      }
+    } catch (_) {
+    } finally {
+      isStoring.value = false;
+    }
+  }
+
   Future<void> deleteStockItem(String id) async {
     try {
       final url = '${ApiEndpoints.stockRemove}/$id';
       final response = await _apiProvider.delete(url);
       final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true);
       if (ok) {
-        // Refresh the list to reflect changes
-        fetchStockList(refresh: true);
+         fetchStockList(refresh: true);
       }
     } catch (error) {
       ApiResponseHandler.showErrorSnackbar(error.toString());
@@ -154,7 +204,7 @@ class HomeController extends GetxController {
         }
       }
     } catch (error) {
-      // silent error handling
+   
     } finally {
       isScanning.value = false;
     }
@@ -262,7 +312,7 @@ class HomeController extends GetxController {
         fetchStockList(refresh: true);
       }
     } catch (error) {
-      // silent error handling
+      
     } finally {
       isStoring.value = false;
     }

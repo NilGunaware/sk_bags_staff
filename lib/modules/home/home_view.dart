@@ -436,93 +436,34 @@ SizedBox(height: 10,),
           SizedBox(
             height: 60,
             child: Obx(() {
-              final data = controller.scanResult.value;
-              final hasResult = data != null && data.isNotEmpty;
-
-              if (!hasResult) {
-                return Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 55,
-                        child: ElevatedButton.icon(
-                          onPressed: controller.isScanning.value ? null : controller.scanItemCode,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+              return Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 55,
+                      child: ElevatedButton.icon(
+                        onPressed: controller.isStoring.value ? null : controller.storeItemEnsureScan,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          icon: controller.isScanning.value
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
-                              : const Icon(Icons.qr_code_scanner),
-                          label: Text(controller.isScanning.value ? 'Scanning...' : 'Enter'),
                         ),
+                        icon: controller.isStoring.value
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save_outlined),
+                        label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
                       ),
                     ),
-                  ],
-                );
-              } else {
-                return Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 55,
-                        child: ElevatedButton.icon(
-                          onPressed: controller.isStoring.value ? null : controller.storeScannedItem,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          icon: controller.isStoring.value
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
-                              : const Icon(Icons.save_outlined),
-                          label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
-                        ),
-                      ),
-                    ),
-                    // const SizedBox(width: 5),
-                    // Expanded(
-                    //   child: SizedBox(
-                    //     height: 55,
-                    //     child: ElevatedButton.icon(
-                    //       onPressed: controller.resetScanner,
-                    //       style: ElevatedButton.styleFrom(
-                    //         backgroundColor: Colors.red,
-                    //         foregroundColor: Colors.white,
-                    //         elevation: 0,
-                    //         shape: RoundedRectangleBorder(
-                    //           borderRadius: BorderRadius.circular(12),
-                    //         ),
-                    //       ),
-                    //       icon: controller.isStoring.value
-                    //           ? const SizedBox(
-                    //               width: 20,
-                    //               height: 20,
-                    //               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    //             )
-                    //           : const Icon(Icons.clear),
-                    //       label: const Text('Clear'),
-                    //     ),
-                    //   ),
-                    // ),
-                  ],
-                );
-              }
+                  ),
+                ],
+              );
             }),
           ),
           const SizedBox(height: 8),

@@ -20,6 +20,7 @@ class HomeController extends GetxController {
   Map<String, dynamic>? get user => authController.user.value;
 
   final isProfileLoading = false.obs;
+  final isDeletingItem = false.obs;
   final profile = Rx<Map<String, dynamic>?>(null);
   final isScanning = false.obs;
   final scanResult = Rx<Map<String, dynamic>?>(null);
@@ -79,11 +80,17 @@ class HomeController extends GetxController {
     }
   }
 
-  Future<void> deleteStockItemRecord(Map<String, dynamic> item) async {
-    if (!canDeleteStockItem(item)) return;
+  Future<bool> deleteStockItemRecord(Map<String, dynamic> item) async {
+    if (!canDeleteStockItem(item)) return false;
     final id = item['id']?.toString() ?? '';
-    if (id.isEmpty) return;
-    await deleteStockItem(id);
+    if (id.isEmpty) return false;
+    
+    isDeletingItem.value = true;
+    try {
+      return await deleteStockItem(id);
+    } finally {
+      isDeletingItem.value = false;
+    }
   }
 
   Future<void> storeItemEnsureScan() async {
@@ -124,16 +131,19 @@ class HomeController extends GetxController {
     }
   }
 
-  Future<void> deleteStockItem(String id) async {
+  Future<bool> deleteStockItem(String id) async {
     try {
       final url = '${ApiEndpoints.stockRemove}/$id';
       final response = await _apiProvider.delete(url);
-      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true);
+      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true, showSuccessMessage: false);
       if (ok) {
-        fetchStockList(refresh: true);
+        await fetchStockList(refresh: true);
+        return true;
       }
+      return false;
     } catch (error) {
       ApiResponseHandler.showErrorSnackbar(error.toString());
+      return false;
     }
   }
 
@@ -279,6 +289,7 @@ class HomeController extends GetxController {
     }
   }
 
+  // ignore: unnecessary_overrides
   @override
   void onInit() {
     super.onInit();

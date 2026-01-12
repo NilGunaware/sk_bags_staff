@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../routes/app_routes.dart';
 import '../../core/services/permission_service.dart';
+import '../../core/utils/api_response_handler.dart';
 import '../../routes/app_routes.dart';
 import 'home_controller.dart';
 
@@ -692,38 +692,57 @@ class HomeView extends GetView<HomeController> {
                 style: TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Get.back(),
-                      style: TextButton.styleFrom(foregroundColor: Colors.grey, padding: const EdgeInsets.symmetric(vertical: 12)),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Get.back();
-                        controller.deleteStockItemRecord(item);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              Obx(() => Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: controller.isDeletingItem.value ? null : () => Get.back(),
+                          style: TextButton.styleFrom(
+                              foregroundColor: Colors.grey,
+                              padding: const EdgeInsets.symmetric(vertical: 12)),
+                          child: const Text('Cancel'),
+                        ),
                       ),
-                      child: const Text('Delete'),
-                    ),
-                  ),
-                ],
-              ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: controller.isDeletingItem.value
+                              ? () {}
+                              : () async {
+                                  final success = await controller.deleteStockItemRecord(item);
+                                  if (success) {
+                                    Get.back();
+                                    ApiResponseHandler.showSuccessSnackbar('Item deleted successfully');
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: controller.isDeletingItem.value
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text('Delete'),
+                        ),
+                      ),
+                    ],
+                  )),
             ],
           ),
         ),
       ),
+      barrierDismissible: false,
     );
   }
 

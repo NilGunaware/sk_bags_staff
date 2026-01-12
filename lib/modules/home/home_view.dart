@@ -1041,10 +1041,13 @@ SizedBox(height: 10,),
   void _openCameraScanner() async {
     final ok = await PermissionService.instance.ensureCameraPermission();
     if (!ok) return;
+
     var handled = false;
-    Get.dialog(
+
+    final scannedValue = await Get.dialog<String>(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.all(16),
         child: SizedBox(
           width: 380,
           child: Column(
@@ -1066,9 +1069,7 @@ SizedBox(height: 10,),
                     final value = barcodes.isNotEmpty ? (barcodes.first.rawValue ?? '') : '';
                     if (value.isEmpty) return;
                     handled = true;
-                    controller.scanCodeController.text = value;
-                    Get.back();
-                    controller.scanItemCamera();
+                    Get.back(result: value);
                   },
                 ),
               ),
@@ -1081,7 +1082,9 @@ SizedBox(height: 10,),
                     onPressed: () => Get.back(),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     child: const Text('Close'),
                   ),
@@ -1093,6 +1096,11 @@ SizedBox(height: 10,),
       ),
       barrierDismissible: true,
     );
+
+    if (scannedValue != null && scannedValue.isNotEmpty) {
+      controller.scanCodeController.text = scannedValue;
+      await controller.scanItemCamera();
+    }
   }
 
 }

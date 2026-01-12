@@ -130,10 +130,8 @@ class HomeController extends GetxController {
         'qrcode': scanQrcodeController.text.trim(),
         'code': scanCodeController.text.trim(),
       };
-      print('Scan Payload: $payload');
       final response = await _apiProvider.post(ApiEndpoints.scanQrcode, data: payload);
-      print('Scan Response: $response');
-      final ok = ApiResponseHandler.handleResponse(response);
+      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: false);
       if (ok) {
         final data = response['data'] is Map<String, dynamic>
             ? Map<String, dynamic>.from(response['data'] as Map)
@@ -145,8 +143,7 @@ class HomeController extends GetxController {
         }
       }
     } catch (error) {
-      print('Scan Error: $error');
-      ApiResponseHandler.showErrorSnackbar(error.toString());
+      // silent error handling
     } finally {
       isScanning.value = false;
     }
@@ -245,10 +242,8 @@ class HomeController extends GetxController {
         'quantity': qtyStr,
         'notes': storeNotesController.text.trim(),
       };
-      print('Store Payload: $payload');
       final response = await _apiProvider.post(ApiEndpoints.stockStoreCreate, data: payload);
-      print('Store Response: $response');
-      final ok = ApiResponseHandler.handleResponse(response);
+      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: false);
       if (ok) {
         if (resetAfter) {
           resetScanner();
@@ -256,8 +251,7 @@ class HomeController extends GetxController {
         fetchStockList(refresh: true);
       }
     } catch (error) {
-      print('Store Error: $error');
-      ApiResponseHandler.showErrorSnackbar(error.toString());
+      // silent error handling
     } finally {
       isStoring.value = false;
     }

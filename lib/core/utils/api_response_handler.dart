@@ -19,10 +19,12 @@ class ApiResponseHandler {
   static final Map<String, DateTime> _messageTimestamps =
       <String, DateTime>{};
   static const int _messageCooldownSeconds = 5;
+  static bool silentErrors = true;
 
   static bool handleResponse(
     dynamic response, {
     bool showSuccessMessage = true,
+    bool showErrorMessage = false,
   }) {
     try {
       final Map<String, dynamic> responseData = _asMap(response);
@@ -30,10 +32,10 @@ class ApiResponseHandler {
       final String message = responseData['message']?.toString().trim() ?? '';
 
       if (!status) {
-        if (message.isNotEmpty) {
+        if (!silentErrors && showErrorMessage && message.isNotEmpty) {
           _showMessage(message, isSuccess: false);
         }
-        throw ApiException(message);
+        return false;
       }
 
       if (showSuccessMessage && message.isNotEmpty) {
@@ -41,8 +43,6 @@ class ApiResponseHandler {
       }
 
       return true;
-    } on ApiException {
-      rethrow;
     } catch (_) {
      // _showMessage(AppStrings.defaultError, isSuccess: false);
       return false;
@@ -62,9 +62,10 @@ class ApiResponseHandler {
   static void showSuccessSnackbar(String message) =>
       _showMessage(message, isSuccess: true);
   static void showErrorSnackbar(String message) =>
-      _showMessage(message, isSuccess: false);
+      silentErrors ? null : _showMessage(message, isSuccess: false);
 
   static void _showMessage(String message, {required bool isSuccess}) {
+    if (!isSuccess && silentErrors) return;
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
     if (!_shouldShowMessage(trimmed)) return;

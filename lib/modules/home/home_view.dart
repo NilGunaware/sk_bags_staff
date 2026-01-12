@@ -345,6 +345,7 @@ class HomeView extends GetView<HomeController> {
                 flex: 3,
                 child: TextFormField(
                   controller: controller.scanCodeController,
+                  keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
                     labelText: 'Code',

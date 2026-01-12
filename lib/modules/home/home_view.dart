@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../../core/services/permission_service.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/services/permission_service.dart';
 import 'home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -23,44 +23,24 @@ class HomeView extends GetView<HomeController> {
           onTap: () {
             controller.scaffoldKey.currentState?.openDrawer();
           },
-          child: const Icon(
-            Icons.line_weight_rounded,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.line_weight_rounded, color: Colors.white),
         ),
-          title: const Text(
-            "Dashboard",
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w600,
-            ),
+        title: const Text("Dashboard", style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600)),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            onPressed: () => _showLogoutDialog(),
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Logout',
           ),
-          centerTitle: false,
-          actions: [
-            IconButton(
-              onPressed: () => _showLogoutDialog(),
-              icon: const Icon(Icons.logout, color: Colors.white),
-              tooltip: 'Logout',
-            ),
-          ],
-          elevation: 0,
-        ),
+        ],
+        elevation: 0,
+      ),
 
-
-        body: SafeArea(
+      body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeader(context, user),
-
-              _buildScannerCard(context),
-              const SizedBox(height: 24),
-              _buildStockList(context),
-              const SizedBox(height: 40),
-            ],
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_buildHeader(context, user), _buildScannerCard(context), const SizedBox(height: 24), _buildStockList(context), const SizedBox(height: 40)]),
         ),
       ),
     );
@@ -85,10 +65,7 @@ class HomeView extends GetView<HomeController> {
                         Container(
                           width: 48,
                           height: 48,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                           alignment: Alignment.center,
                           child: const Icon(Icons.person, color: AppColors.primary),
                         ),
@@ -99,80 +76,63 @@ class HomeView extends GetView<HomeController> {
                             children: [
                               Text(
                                 (data?['name'] ?? '—').toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                               ),
-                              Text(
-                                (data?['type'] ?? '—').toString(),
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  fontSize: 12,
-                                ),
-                              ),
+                              Text((data?['type'] ?? '—').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12)),
                             ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Powered by Interlink Consultant',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 12,
-                      ),
-                    ),
+                    Text('Powered by Interlink Consultant', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
                   ],
                 ),
               ),
               Expanded(
-                      child: controller.isProfileLoading.value && data == null
-                          ? const Center(child: Padding(
-                              padding: EdgeInsets.all(16), 
-                              child: CircularProgressIndicator(color: AppColors.primary)))
-                          : Column(
+                child: controller.isProfileLoading.value && data == null
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(color: AppColors.primary),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: ListView(
+                              padding: const EdgeInsets.all(16),
                               children: [
-                                Expanded(
-                                  child: ListView(
-                                    padding: const EdgeInsets.all(16),
-                                    children: [
-                                     // _infoTile(Icons.badge, 'ID', data?['id']),
-                                      _infoTile(Icons.person_outline, 'Name', data?['name']),
-                                      _infoTile(Icons.phone_android, 'Mobile', data?['mobile_no']),
-                                      _infoTile(Icons.email_outlined, 'Email', data?['email']),
-                                      _infoTile(Icons.verified_user_outlined, 'Type', data?['type']),
-                                    //  _infoTile(Icons.admin_panel_settings_outlined, 'Role ID', data?['role_id']),
-                                    //  _infoTile(Icons.store_outlined, 'Branch ID', data?['branch_id']),
-                                      _infoTile(Icons.calendar_today_outlined, 'Financial Year', data?['financial_year']),
-                                     // _infoTile(Icons.timer_outlined, 'Expiry Time (sec)', data?['expiry_time']),
-                                    //  _infoTile(Icons.event, 'Created At', _formatEpoch(data?['created_at'])),
-                                      _linkTile(Icons.link, 'Issuer', data?['iss']),
-                                    ],
-                                  ),
-                                ),
-                                const Divider(height: 1),
-                                ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                                  leading: const Icon(Icons.logout, color: Colors.redAccent),
-                                  title: const Text(
-                                    'Logout',
-                                    style: TextStyle(
-                                      color: Colors.redAccent,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    Get.back();
-                                    _showLogoutDialog();
-                                  },
-                                ),
+                                // _infoTile(Icons.badge, 'ID', data?['id']),
+                                _infoTile(Icons.person_outline, 'Name', data?['name']),
+                                _infoTile(Icons.phone_android, 'Mobile', data?['mobile_no']),
+                                _infoTile(Icons.email_outlined, 'Email', data?['email']),
+                                _infoTile(Icons.verified_user_outlined, 'Type', data?['type']),
+                                //  _infoTile(Icons.admin_panel_settings_outlined, 'Role ID', data?['role_id']),
+                                //  _infoTile(Icons.store_outlined, 'Branch ID', data?['branch_id']),
+                                _infoTile(Icons.calendar_today_outlined, 'Financial Year', data?['financial_year']),
+                                // _infoTile(Icons.timer_outlined, 'Expiry Time (sec)', data?['expiry_time']),
+                                //  _infoTile(Icons.event, 'Created At', _formatEpoch(data?['created_at'])),
+                                _linkTile(Icons.link, 'Issuer', data?['iss']),
                               ],
                             ),
-                    ),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                            leading: const Icon(Icons.logout, color: Colors.redAccent),
+                            title: const Text(
+                              'Logout',
+                              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            onTap: () {
+                              Get.back();
+                              _showLogoutDialog();
+                            },
+                          ),
+                        ],
+                      ),
+              ),
             ],
           );
         }),
@@ -187,7 +147,7 @@ class HomeView extends GetView<HomeController> {
       if (seconds == null) return '—';
       final dt = DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true).toLocal();
       return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-             '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return '—';
     }
@@ -207,55 +167,39 @@ class HomeView extends GetView<HomeController> {
       leading: Icon(icon, color: AppColors.primary),
       title: Text(label),
       subtitle: Text(txt.isEmpty ? '—' : txt),
-      trailing: txt.isEmpty ? null : IconButton(
-        icon: const Icon(Icons.copy, color: AppColors.primary),
-        onPressed: () => controller.copyToClipboard(txt),
-        tooltip: 'Copy',
-      ),
+      trailing: txt.isEmpty
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.copy, color: AppColors.primary),
+              onPressed: () => controller.copyToClipboard(txt),
+              tooltip: 'Copy',
+            ),
     );
   }
+
   Widget _buildHeader(BuildContext context, Map<String, dynamic>? user) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.2),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.2), blurRadius: 15, offset: const Offset(0, 8))],
       ),
       child: Row(
         children: [
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'SK Bags Staff',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Stock Management System',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 14,
-                  ),
-                ),
+                Text('Stock Management System', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14)),
               ],
             ),
           ),
-
         ],
       ),
     );
@@ -269,24 +213,14 @@ class HomeView extends GetView<HomeController> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.accent),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
             'Scan QR with Camera',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -305,38 +239,20 @@ class HomeView extends GetView<HomeController> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: Divider(
-                  color: Colors.grey,
-                  thickness: 1,
-                ),
-              ),
+              Expanded(child: Divider(color: Colors.grey, thickness: 1)),
               const SizedBox(width: 8),
               const Text(
                 'OR',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: Divider(
-                  color: Colors.grey,
-                  thickness: 1,
-                ),
-              ),
+              Expanded(child: Divider(color: Colors.grey, thickness: 1)),
             ],
           ),
           const SizedBox(height: 12),
           const Text(
             'Enter Code Manually',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
           ),
           const SizedBox(height: 6),
           Row(
@@ -359,43 +275,25 @@ class HomeView extends GetView<HomeController> {
                         width: 40,
                         height: 40,
                         child: ElevatedButton(
-                          onPressed: controller.isStoring.value
-                              ? null
-                              : controller.resetScanner,
+                          onPressed: controller.isStoring.value ? null : controller.resetScanner,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: controller.isStoring.value
-                              ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                              : const Icon(Icons.clear, size: 18),
+                          child: controller.isStoring.value ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.clear, size: 18),
                         ),
                       ),
                     ),
 
                     filled: true,
                     fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
-
-
-
             ],
           ),
           const SizedBox(height: 12),
@@ -413,7 +311,7 @@ class HomeView extends GetView<HomeController> {
           Obx(() {
             final data = controller.scanResult.value;
             final showForm = controller.showStoreForm.value;
-            
+
             // Hide ONLY if we have scan results AND it was a camera scan (showForm is false)
             if (data != null && data.isNotEmpty && !showForm) {
               return const SizedBox.shrink();
@@ -423,16 +321,11 @@ class HomeView extends GetView<HomeController> {
               controller: controller.storeQuantityController,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'Quantity',
-                prefixIcon: Icon(Icons.inventory_2_outlined),
-                filled: true,
-                fillColor: Colors.white,
-              ),
+              decoration: const InputDecoration(labelText: 'Quantity', prefixIcon: Icon(Icons.inventory_2_outlined), filled: true, fillColor: Colors.white),
             );
           }),
 
-SizedBox(height: 10,),
+          SizedBox(height: 10),
           SizedBox(
             height: 60,
             child: Obx(() {
@@ -447,17 +340,9 @@ SizedBox(height: 10,),
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        icon: controller.isStoring.value
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.save_outlined),
+                        icon: controller.isStoring.value ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save_outlined),
                         label: Text(controller.isStoring.value ? 'Saving...' : 'Save'),
                       ),
                     ),
@@ -467,7 +352,6 @@ SizedBox(height: 10,),
             }),
           ),
           const SizedBox(height: 8),
-
 
           Obx(() {
             final data = controller.scanResult.value;
@@ -481,11 +365,7 @@ SizedBox(height: 10,),
 
                 const Text(
                   'Store',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
                 ),
 
                 // TextFormField(
@@ -503,19 +383,14 @@ SizedBox(height: 10,),
                 //   ),
                 // ),
                 // const SizedBox(height: 8),
-
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: controller.storeNotesController,
                   maxLines: 1,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes',
-                    prefixIcon: Icon(Icons.notes),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+                  decoration: const InputDecoration(labelText: 'Notes', prefixIcon: Icon(Icons.notes), filled: true, fillColor: Colors.white),
                 ),
                 const SizedBox(height: 10),
+
                 // SizedBox(
                 //   child: Row(
                 //     children: [
@@ -563,26 +438,20 @@ SizedBox(height: 10,),
                 //   ),
                 // ),
                 // const SizedBox(height: 8),
-
                 const Divider(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'Result',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
                     ),
-
                   ],
                 ),
                 const SizedBox(height: 8),
                 _infoTile(Icons.sell_outlined, 'Item Code', data['item_code']),
                 _infoTile(Icons.label_important_outline, 'Item Name', data['item_name']),
-               // _infoTile(Icons.qr_code_2, 'Item Qrcode', data['item_qrcode']),
+                // _infoTile(Icons.qr_code_2, 'Item Qrcode', data['item_qrcode']),
                 _infoTile(Icons.category_outlined, 'Group', data['group_name']),
                 _infoTile(Icons.home_work_outlined, 'Company', data['company_name']),
                 Row(
@@ -591,7 +460,6 @@ SizedBox(height: 10,),
                     Expanded(child: _infoTile(Icons.qr_code_scanner, 'Scanned Qty', data['scanned_quantity'])),
                   ],
                 ),
-
               ],
             );
           }),
@@ -611,28 +479,19 @@ SizedBox(height: 10,),
               children: [
                 const Text(
                   'Stock List',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
                 ),
                 const SizedBox(width: 8),
-                Obx(() => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${controller.stockTotal.value}',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                Obx(
+                  () => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                    child: Text(
+                      '${controller.stockTotal.value}',
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                   ),
-                )),
+                ),
               ],
             ),
             IconButton(
@@ -645,10 +504,12 @@ SizedBox(height: 10,),
         const SizedBox(height: 12),
         Obx(() {
           if (controller.isLoadingStock.value && controller.stockList.isEmpty) {
-            return const Center(child: Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ));
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            );
           }
           if (controller.stockList.isEmpty) {
             return Container(
@@ -671,7 +532,7 @@ SizedBox(height: 10,),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: controller.stockList.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (c, i) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = controller.stockList[index];
               final canDelete = controller.canDeleteStockItem(item);
@@ -679,13 +540,7 @@ SizedBox(height: 10,),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                     BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                  ],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
                 ),
                 child: Material(
                   color: Colors.transparent,
@@ -704,10 +559,7 @@ SizedBox(height: 10,),
                               Container(
                                 width: 40,
                                 height: 40,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
                                 child: const Icon(Icons.inventory_2, color: AppColors.primary),
                               ),
                               const SizedBox(width: 12),
@@ -715,22 +567,9 @@ SizedBox(height: 10,),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      item['item_name']?.toString() ?? '—',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        height: 1.2,
-                                      ),
-                                    ),
+                                    Text(item['item_name']?.toString() ?? '—', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, height: 1.2)),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      item['company_name']?.toString() ?? '—',
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                    ),
+                                    Text(item['company_name']?.toString() ?? '—', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                                   ],
                                 ),
                               ),
@@ -739,48 +578,22 @@ SizedBox(height: 10,),
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
+                                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
                                     child: Text(
                                       '${item['quantity'] ?? 0}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
                                   ),
                                 ],
                               ),
                             ],
                           ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            child: Divider(height: 1),
-                          ),
+                          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
                           Row(
                             children: [
-                              Expanded(
-                                child: Column(
-                                  children: [
-                                    _stockDetailItem(Icons.numbers, 'Code', item['code']),
-                                    const SizedBox(height: 6),
-                                    _stockDetailItem(Icons.qr_code, 'QR', item['qrcode']),
-                                  ],
-                                ),
-                              ),
+                              Expanded(child: Column(children: [_stockDetailItem(Icons.numbers, 'Code', item['code']), const SizedBox(height: 6), _stockDetailItem(Icons.qr_code, 'QR', item['qrcode'])])),
                               const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  children: [
-                                    _stockDetailItem(Icons.category_outlined, 'Group', item['group_name']),
-                                    const SizedBox(height: 6),
-                                    _stockDetailItem(Icons.fingerprint, 'ID', item['id']),
-                                  ],
-                                ),
-                              ),
+                              Expanded(child: Column(children: [_stockDetailItem(Icons.category_outlined, 'Group', item['group_name']), const SizedBox(height: 6), _stockDetailItem(Icons.fingerprint, 'ID', item['id'])])),
                             ],
                           ),
                           if (canDelete) ...[
@@ -811,20 +624,16 @@ SizedBox(height: 10,),
           );
         }),
         Obx(() {
-           if (controller.stockList.length < controller.stockTotal.value) {
-             return Padding(
-               padding: const EdgeInsets.only(top: 12),
-               child: TextButton(
-                 onPressed: controller.isLoadingStock.value 
-                     ? null 
-                     : () => controller.fetchStockList(),
-                 child: controller.isLoadingStock.value 
-                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                     : const Text('Load More'),
-               ),
-             );
-           }
-           return const SizedBox.shrink();
+          if (controller.stockList.length < controller.stockTotal.value) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: TextButton(
+                onPressed: controller.isLoadingStock.value ? null : () => controller.fetchStockList(),
+                child: controller.isLoadingStock.value ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Load More'),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
         }),
       ],
     );
@@ -845,11 +654,7 @@ SizedBox(height: 10,),
                 ),
                 TextSpan(
                   text: value?.toString() ?? '—',
-                  style: TextStyle(
-                    color: Colors.grey[800],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(color: Colors.grey[800], fontSize: 12, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -891,10 +696,7 @@ SizedBox(height: 10,),
                   Expanded(
                     child: TextButton(
                       onPressed: () => Get.back(),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.grey,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                      style: TextButton.styleFrom(foregroundColor: Colors.grey, padding: const EdgeInsets.symmetric(vertical: 12)),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -951,10 +753,7 @@ SizedBox(height: 10,),
                   Expanded(
                     child: TextButton(
                       onPressed: () => Get.back(),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 12)),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -1028,9 +827,7 @@ SizedBox(height: 10,),
                     onPressed: () => Get.back(),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     child: const Text('Close'),
                   ),
@@ -1048,5 +845,4 @@ SizedBox(height: 10,),
       await controller.scanItemCamera();
     }
   }
-
 }

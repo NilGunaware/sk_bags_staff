@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../routes/app_routes.dart';
 import '../../core/services/permission_service.dart';
+import '../../routes/app_routes.dart';
 import 'home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -787,60 +788,9 @@ class HomeView extends GetView<HomeController> {
     final ok = await PermissionService.instance.ensureCameraPermission();
     if (!ok) return;
 
-    var handled = false;
+    final scannedValue = await Get.toNamed(Routes.scanner);
 
-    final scannedValue = await Get.dialog<String>(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        insetPadding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: 380,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 300,
-                margin: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.accent),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: MobileScanner(
-                  fit: BoxFit.cover,
-                  onDetect: (capture) {
-                    if (handled) return;
-                    final barcodes = capture.barcodes;
-                    final value = barcodes.isNotEmpty ? (barcodes.first.rawValue ?? '') : '';
-                    if (value.isEmpty) return;
-                    handled = true;
-                    Get.back(result: value);
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: TextButton(
-                    onPressed: () => Get.back(),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Close'),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      barrierDismissible: true,
-    );
-
-    if (scannedValue != null && scannedValue.isNotEmpty) {
+    if (scannedValue != null && scannedValue is String && scannedValue.isNotEmpty) {
       controller.scanCodeController.text = scannedValue;
       await controller.scanItemCamera();
     }

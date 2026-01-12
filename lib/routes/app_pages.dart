@@ -1,11 +1,15 @@
 import 'package:get/get.dart';
 
+import '../modules/scanner/scanner_binding.dart';
+import '../modules/scanner/scanner_view.dart';
 import '../modules/splash/splash_binding.dart';
 import '../modules/splash/splash_view.dart';
 import '../modules/auth/login/login_binding.dart';
 import '../modules/auth/login/login_view.dart';
 import '../modules/home/home_binding.dart';
 import '../modules/home/home_view.dart';
+import '../modules/scanner/scanner_binding.dart';
+import '../modules/scanner/scanner_view.dart';
 import 'app_routes.dart';
 
 class AppPages {
@@ -24,6 +28,11 @@ class AppPages {
       name: Routes.home,
       page: () => const HomeView(),
       binding: HomeBinding(),
+    ),
+    GetPage(
+      name: Routes.scanner,
+      page: () => const ScannerView(),
+      binding: ScannerBinding(),
     ),
   ];
 }

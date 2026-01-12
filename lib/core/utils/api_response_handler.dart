@@ -32,7 +32,7 @@ class ApiResponseHandler {
       final String message = responseData['message']?.toString().trim() ?? '';
 
       if (!status) {
-        if (!silentErrors && showErrorMessage && message.isNotEmpty) {
+        if (showErrorMessage && message.isNotEmpty) {
           _showMessage(message, isSuccess: false);
         }
         return false;
@@ -62,10 +62,9 @@ class ApiResponseHandler {
   static void showSuccessSnackbar(String message) =>
       _showMessage(message, isSuccess: true);
   static void showErrorSnackbar(String message) =>
-      silentErrors ? null : _showMessage(message, isSuccess: false);
+      _showMessage(message, isSuccess: false);
 
   static void _showMessage(String message, {required bool isSuccess}) {
-    if (!isSuccess && silentErrors) return;
     final trimmed = message.trim();
     if (trimmed.isEmpty) return;
     if (!_shouldShowMessage(trimmed)) return;

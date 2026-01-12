@@ -733,6 +733,7 @@ SizedBox(height: 10,),
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = controller.stockList[index];
+              final canDelete = controller.canDeleteStockItem(item);
               return Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -841,22 +842,24 @@ SizedBox(height: 10,),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 36,
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _confirmDelete(item['id']?.toString() ?? ''),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.redAccent,
-                                side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                padding: EdgeInsets.zero,
+                          if (canDelete) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 36,
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () => _confirmDelete(item),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.redAccent,
+                                  side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                label: const Text('Remove Item', style: TextStyle(fontSize: 13)),
                               ),
-                              icon: const Icon(Icons.delete_outline, size: 18),
-                              label: const Text('Remove Item', style: TextStyle(fontSize: 13)),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -917,7 +920,9 @@ SizedBox(height: 10,),
     );
   }
 
-  void _confirmDelete(String id) {
+  void _confirmDelete(Map<String, dynamic> item) {
+    if (!controller.canDeleteStockItem(item)) return;
+    final id = item['id']?.toString() ?? '';
     if (id.isEmpty) return;
     Get.dialog(
       Dialog(
@@ -957,7 +962,7 @@ SizedBox(height: 10,),
                     child: ElevatedButton(
                       onPressed: () {
                         Get.back();
-                        controller.deleteStockItem(id);
+                        controller.deleteStockItemRecord(item);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.redAccent,

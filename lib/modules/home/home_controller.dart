@@ -34,6 +34,10 @@ class HomeController extends GetxController {
   final stockOffset = 0.obs;
   final stockTotal = 0.obs;
 
+  bool canDeleteStockItem(Map<String, dynamic> item) {
+    return item['is_delete']?.toString() == '1';
+  }
+
   Future<void> fetchStockList({bool refresh = false}) async {
     if (refresh) {
       stockOffset.value = 0;
@@ -78,11 +82,18 @@ class HomeController extends GetxController {
     }
   }
 
+  Future<void> deleteStockItemRecord(Map<String, dynamic> item) async {
+    if (!canDeleteStockItem(item)) return;
+    final id = item['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    await deleteStockItem(id);
+  }
+
   Future<void> deleteStockItem(String id) async {
     try {
       final url = '${ApiEndpoints.stockRemove}/$id';
       final response = await _apiProvider.delete(url);
-      final ok = ApiResponseHandler.handleResponse(response);
+      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true);
       if (ok) {
         // Refresh the list to reflect changes
         fetchStockList(refresh: true);

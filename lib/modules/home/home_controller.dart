@@ -45,6 +45,7 @@ class HomeController extends GetxController {
     if (refresh) {
       stockOffset.value = 0;
       stockList.clear();
+      stockTotal.value = 0;
     }
     isLoadingStock.value = true;
     try {

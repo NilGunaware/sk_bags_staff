@@ -75,7 +75,7 @@ class HomeController extends GetxController {
         }
       }
     } catch (error) {
-      ApiResponseHandler.showErrorSnackbar(error.toString());
+      // ApiResponseHandler.showErrorSnackbar(error.toString());
     } finally {
       isLoadingStock.value = false;
     }
@@ -124,9 +124,12 @@ class HomeController extends GetxController {
       final okStore = ApiResponseHandler.handleResponse(responseStore, showErrorMessage: true);
       if (okStore) {
         resetScanner();
-        fetchStockList(refresh: true);
+        // Add a small delay to ensure backend has processed the transaction
+        await Future.delayed(const Duration(milliseconds: 500));
+        await fetchStockList(refresh: true);
       }
-    } catch (_) {
+    } catch (e) {
+      // ApiResponseHandler.showErrorSnackbar(e.toString());
     } finally {
       isStoring.value = false;
     }
@@ -143,7 +146,7 @@ class HomeController extends GetxController {
       }
       return false;
     } catch (error) {
-      ApiResponseHandler.showErrorSnackbar(error.toString());
+      // ApiResponseHandler.showErrorSnackbar(error.toString());
       return false;
     }
   }
@@ -171,7 +174,7 @@ class HomeController extends GetxController {
         profile.value = data;
       }
     } catch (error) {
-      ApiResponseHandler.showErrorSnackbar(error.toString());
+      // ApiResponseHandler.showErrorSnackbar(error.toString());
     } finally {
       isProfileLoading.value = false;
     }
@@ -283,8 +286,10 @@ class HomeController extends GetxController {
         if (resetAfter) {
           resetScanner();
         }
-        fetchStockList(refresh: true);
+        await fetchStockList(refresh: true);
       }
+    } catch (e) {
+      // ApiResponseHandler.showErrorSnackbar(e.toString());
     } finally {
       isStoring.value = false;
     }

@@ -43,8 +43,11 @@ class ApiResponseHandler {
       }
 
       return true;
-    } catch (_) {
-     // _showMessage(AppStrings.defaultError, isSuccess: false);
+    } catch (e) {
+      if (showErrorMessage) {
+         // Silently handle exceptions as per user request
+         // _showMessage('An unexpected error occurred', isSuccess: false);
+      }
       return false;
     }
   }

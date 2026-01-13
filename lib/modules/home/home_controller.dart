@@ -182,7 +182,7 @@ class HomeController extends GetxController {
     try {
       final payload = {'qrcode': scanQrcodeController.text.trim(), 'code': scanCodeController.text.trim()};
       final response = await _apiProvider.post(ApiEndpoints.scanQrcode, data: payload);
-      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: false);
+      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true);
       if (ok) {
         final data = response['data'] is Map<String, dynamic> ? Map<String, dynamic>.from(response['data'] as Map) : <String, dynamic>{};
         scanResult.value = data;

@@ -101,7 +101,7 @@ class LoginController extends GetxController {
       return;
     }
 
-    final handled = ApiResponseHandler.handleResponse(payload);
+    final handled = ApiResponseHandler.handleResponse(payload, showErrorMessage: true);
     if (!handled) return;
 
     if (response.isSuccess && response.data != null) {

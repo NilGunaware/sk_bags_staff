@@ -227,7 +227,7 @@ class HomeView extends GetView<HomeController> {
           SizedBox(
             height: 55,
             child: OutlinedButton.icon(
-              onPressed: () => _openCameraScanner(),
+              onPressed: () => _openCameraScanner(context),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
@@ -677,82 +677,95 @@ class HomeView extends GetView<HomeController> {
 
   void _confirmDelete(Map<String, dynamic> item) {
     if (!controller.canDeleteStockItem(item)) return;
-    final id = item['id']?.toString() ?? '';
-    if (id.isEmpty) return;
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.redAccent),
-              const SizedBox(height: 16),
-              const Text(
-                'Delete Item',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.redAccent),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Are you sure you want to delete this item?',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 24),
-              Obx(() => Row(
+
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 48, color: Colors.redAccent),
+                const SizedBox(height: 16),
+                const Text(
+                  'Delete Item',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.redAccent,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Are you sure you want to delete this item?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+
+                Obx(() {
+                  final deleting = controller.isDeletingItem.value;
+
+                  return Row(
                     children: [
                       Expanded(
                         child: TextButton(
-                          onPressed: controller.isDeletingItem.value ? null : () => Get.back(),
-                          style: TextButton.styleFrom(
-                              foregroundColor: Colors.grey,
-                              padding: const EdgeInsets.symmetric(vertical: 12)),
+                          onPressed: deleting
+                              ? null
+                              : () => Navigator.of(dialogContext).pop(),
                           child: const Text('Cancel'),
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: controller.isDeletingItem.value
-                              ? () {}
+                          onPressed: deleting
+                              ? null
                               : () async {
-                                  final success = await controller.deleteStockItemRecord(item);
-                                  if (success) {
-                                    Get.back();
-                                    ApiResponseHandler.showSuccessSnackbar('Item deleted successfully');
-                                  }
-                                },
+                            final success =
+                            await controller.deleteStockItemRecord(item);
+
+                            if (success && dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                              ApiResponseHandler.showSuccessSnackbar(
+                                'Item deleted successfully',
+                              );
+                            }
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.redAccent,
                             foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
                           ),
-                          child: controller.isDeletingItem.value
+                          child: deleting
                               ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                               : const Text('Delete'),
                         ),
                       ),
                     ],
-                  )),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
-        ),
-      ),
-      barrierDismissible: false,
+        );
+      },
     );
   }
+
 
   void _showLogoutDialog() {
     Get.dialog(
@@ -811,15 +824,18 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
-  void _openCameraScanner() async {
+  void _openCameraScanner(BuildContext context) async {
     final ok = await PermissionService.instance.ensureCameraPermission();
     if (!ok) return;
 
-    final scannedValue = await Get.toNamed(Routes.scanner);
+    final scannedValue =
+    await Navigator.of(context).pushNamed(Routes.scanner);
 
-    if (scannedValue != null && scannedValue is String && scannedValue.isNotEmpty) {
+    if (scannedValue is String && scannedValue.isNotEmpty) {
       controller.scanCodeController.text = scannedValue;
       await controller.scanItemCamera();
     }
   }
+
+
 }

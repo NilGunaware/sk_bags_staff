@@ -262,6 +262,7 @@ class HomeView extends GetView<HomeController> {
                 flex: 3,
                 child: TextFormField(
                   controller: controller.scanCodeController,
+                  focusNode: controller.scanCodeFocusNode,
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
@@ -275,7 +276,7 @@ class HomeView extends GetView<HomeController> {
                       child: SizedBox(
                         width: 40,
                         height: 40,
-                        child: ElevatedButton(
+                        child: Obx(() => ElevatedButton(
                           onPressed: controller.isStoring.value ? null : controller.resetScanner,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
@@ -285,7 +286,7 @@ class HomeView extends GetView<HomeController> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           child: controller.isStoring.value ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.clear, size: 18),
-                        ),
+                        )),
                       ),
                     ),
 

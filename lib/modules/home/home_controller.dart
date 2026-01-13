@@ -26,6 +26,7 @@ class HomeController extends GetxController {
   final scanResult = Rx<Map<String, dynamic>?>(null);
   final scanQrcodeController = TextEditingController();
   final scanCodeController = TextEditingController();
+  final scanCodeFocusNode = FocusNode();
   final isStoring = false.obs;
   final showStoreForm = false.obs;
   final storeUuidController = TextEditingController(text: '${DateTime.now().millisecondsSinceEpoch}');
@@ -127,6 +128,9 @@ class HomeController extends GetxController {
         // Add a small delay to ensure backend has processed the transaction
         await Future.delayed(const Duration(milliseconds: 500));
         await fetchStockList(refresh: true);
+        
+        // Request focus back to code input field
+        scanCodeFocusNode.requestFocus();
       }
     } catch (e) {
       // ApiResponseHandler.showErrorSnackbar(e.toString());
@@ -307,6 +311,7 @@ class HomeController extends GetxController {
   void onClose() {
     scanQrcodeController.dispose();
     scanCodeController.dispose();
+    scanCodeFocusNode.dispose();
     storeUuidController.dispose();
     storeQuantityController.dispose();
     storeNotesController.dispose();

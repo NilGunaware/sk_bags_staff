@@ -4,6 +4,8 @@
 *.pyc
 *.swp
 .DS_Store
+._*
+._.*
 .atom/
 .build/
 .buildlog/
@@ -32,6 +34,9 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+node_modules/
+server_fastapi/.env
+server_fastapi/.venv/
 
 # Symbolication related
 app.*.symbols
@@ -43,3 +48,4 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/SKBAGS

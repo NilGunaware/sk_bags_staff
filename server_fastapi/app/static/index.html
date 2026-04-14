@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SK Bags Control Room</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/common.js" defer></script>
+    <script src="/static/home.js" defer></script>
+  </head>
+  <body data-page="home">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">SK</span>
+        <span class="brand-copy">
+          <strong>SK Bags</strong>
+          <small>Control Room</small>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="/" data-nav="home">Home</a>
+        <a href="/orders" data-nav="orders">Orders</a>
+        <a href="/orders/new" data-nav="create-order">Create Order</a>
+        <a href="/items" data-nav="items">Items</a>
+      </nav>
+      <div class="topmeta">
+        <span class="status-chip" data-meta="health">Checking</span>
+        <span class="meta-chip" data-meta="database">Loading DB</span>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="hero hero-home">
+        <div class="hero-copy">
+          <p class="eyebrow">Single Recent Database</p>
+          <h1>Separate pages for orders, items, and order creation.</h1>
+          <p class="hero-text">
+            This UI is connected to the recent BUSY database only: `BusyComp0019_db12026`. Use the
+            dedicated pages below to browse items, filter order history, open order details, and create
+            new orders in a cleaner flow.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="/orders">Open Orders</a>
+            <a class="btn btn-secondary" href="/orders/new">Create Order</a>
+            <a class="btn btn-secondary" href="/items">Browse Items</a>
+          </div>
+        </div>
+        <div class="hero-panel">
+          <p class="eyebrow">API Links</p>
+          <div class="link-stack">
+            <a href="/docs" target="_blank" rel="noreferrer">Swagger UI</a>
+            <a href="/redoc" target="_blank" rel="noreferrer">ReDoc</a>
+            <a href="/openapi.json" target="_blank" rel="noreferrer">OpenAPI JSON</a>
+            <a href="/health" target="_blank" rel="noreferrer">Health Check</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="stat-grid">
+        <article class="stat-card">
+          <span>Database</span>
+          <strong id="homeDatabase">Loading...</strong>
+          <small>Recent year only</small>
+        </article>
+        <article class="stat-card">
+          <span>Total Orders</span>
+          <strong id="homeOrdersCount">...</strong>
+          <small>From custom API order tables</small>
+        </article>
+        <article class="stat-card">
+          <span>Total Items</span>
+          <strong id="homeItemsCount">...</strong>
+          <small>Filterable with pagination</small>
+        </article>
+        <article class="stat-card">
+          <span>Draft Items</span>
+          <strong data-draft-count>0</strong>
+          <small>Ready for create order page</small>
+        </article>
+      </section>
+
+      <section class="card-grid">
+        <a class="route-card" href="/orders">
+          <p class="eyebrow">Orders</p>
+          <h2>Order list page</h2>
+          <p>Filter by order number, party, item code, item name, and date range. Open each order on its own detail page.</p>
+        </a>
+        <a class="route-card" href="/orders/new">
+          <p class="eyebrow">Create</p>
+          <h2>Create order page</h2>
+          <p>Add order lines, reuse draft items from the items page, and submit directly to `POST /api/orders`.</p>
+        </a>
+        <a class="route-card" href="/items">
+          <p class="eyebrow">Items</p>
+          <h2>Item browser page</h2>
+          <p>Search item code, item name, and see quantity from the recent BUSY database with pagination.</p>
+        </a>
+      </section>
+    </main>
+  </body>
+</html>

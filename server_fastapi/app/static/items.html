@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Items | SK Bags</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/common.js" defer></script>
+    <script src="/static/items.js" defer></script>
+  </head>
+  <body data-page="items">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">SK</span>
+        <span class="brand-copy">
+          <strong>SK Bags</strong>
+          <small>Control Room</small>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="/" data-nav="home">Home</a>
+        <a href="/orders" data-nav="orders">Orders</a>
+        <a href="/orders/new" data-nav="create-order">Create Order</a>
+        <a href="/items" data-nav="items">Items</a>
+      </nav>
+      <div class="topmeta">
+        <span class="status-chip" data-meta="health">Checking</span>
+        <span class="meta-chip" data-meta="database">Loading DB</span>
+      </div>
+    </header>
+
+    <main class="shell page-stack">
+      <section class="page-hero">
+        <div>
+          <p class="eyebrow">Items</p>
+          <h1>Browse items and send them into an order draft.</h1>
+          <p class="hero-text">
+            This page is focused only on item search. Use filters and pagination here, then move selected items
+            into the create-order page through the draft flow.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/orders/new">Open Create Order</a>
+          <span class="meta-chip" id="draftSummaryChip">Draft 0</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Search</p>
+            <h2>Item filters</h2>
+          </div>
+          <span class="meta-chip" id="itemsMeta">Loading...</span>
+        </div>
+
+        <form id="itemsFilterForm" class="field-grid field-grid-compact">
+          <label>
+            <span>Item Code</span>
+            <input type="text" id="itemsItemCode" placeholder="44593" />
+          </label>
+          <label>
+            <span>Item Name</span>
+            <input type="text" id="itemsItemName" placeholder="BackPack" />
+          </label>
+          <label>
+            <span>QR Code</span>
+            <input type="text" id="itemsQrCode" placeholder="Only if available in DB" />
+          </label>
+          <label>
+            <span>Page Size</span>
+            <select id="itemsPageSize">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+            </select>
+          </label>
+          <div class="action-row">
+            <button class="btn btn-primary" type="submit">Apply Filters</button>
+            <button class="btn btn-secondary" type="button" id="itemsResetBtn">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Results</p>
+            <h2>Item list</h2>
+          </div>
+          <span class="meta-chip" id="qrStatusChip">Waiting...</span>
+        </div>
+
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Item Code</th>
+                <th>Item Name</th>
+                <th>Group</th>
+                <th>Qty</th>
+                <th>QR</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="itemsTableBody">
+              <tr>
+                <td class="empty" colspan="6">Loading items...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pager">
+          <button class="btn btn-secondary" id="itemsPrevBtn" type="button">Previous</button>
+          <span id="itemsPaginationText">Page 1</span>
+          <button class="btn btn-secondary" id="itemsNextBtn" type="button">Next</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

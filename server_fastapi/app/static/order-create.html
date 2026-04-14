@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Order | SK Bags</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/common.js" defer></script>
+    <script src="/static/order-create.js" defer></script>
+  </head>
+  <body data-page="create-order">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">SK</span>
+        <span class="brand-copy">
+          <strong>SK Bags</strong>
+          <small>Control Room</small>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="/" data-nav="home">Home</a>
+        <a href="/orders" data-nav="orders">Orders</a>
+        <a href="/orders/new" data-nav="create-order">Create Order</a>
+        <a href="/items" data-nav="items">Items</a>
+      </nav>
+      <div class="topmeta">
+        <span class="status-chip" data-meta="health">Checking</span>
+        <span class="meta-chip" data-meta="database">Loading DB</span>
+      </div>
+    </header>
+
+    <main class="shell page-stack">
+      <section class="page-hero">
+        <div>
+          <p class="eyebrow">Create Order</p>
+          <h1>Place a new order on its own page.</h1>
+          <p class="hero-text">
+            Use this page to create orders with multiple line items. Items added from the item browser are
+            stored as a draft and can be loaded here automatically.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <a class="btn btn-secondary" href="/items">Add From Items</a>
+          <a class="btn btn-secondary" href="/orders">Back To Orders</a>
+        </div>
+      </section>
+
+      <section class="panel-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Form</p>
+              <h2>Order header and lines</h2>
+            </div>
+            <span class="meta-chip" id="draftChip">Draft 0</span>
+          </div>
+
+          <form id="createOrderForm" class="section-stack">
+            <div class="field-grid">
+              <label>
+                <span>Order Date</span>
+                <input type="date" id="createOrderDate" />
+              </label>
+              <label>
+                <span>Series Code</span>
+                <input type="text" id="createSeriesCode" placeholder="12/Abo" />
+              </label>
+              <label>
+                <span>Party Name</span>
+                <input type="text" id="createPartyName" placeholder="Bag Bazaar Vorabazar" required />
+              </label>
+            </div>
+
+            <div class="panel-subhead">
+              <div>
+                <p class="eyebrow">Line Items</p>
+                <h3>Order lines</h3>
+              </div>
+              <div class="action-row">
+                <button class="btn btn-secondary" type="button" id="loadDraftBtn">Load Draft</button>
+                <button class="btn btn-secondary" type="button" id="addLineBtn">Add Line</button>
+              </div>
+            </div>
+
+            <div id="orderLines" class="line-list"></div>
+
+            <div class="action-row">
+              <button class="btn btn-primary" type="submit">Create Order</button>
+              <button class="btn btn-secondary" type="button" id="resetFormBtn">Reset Form</button>
+              <button class="btn btn-secondary" type="button" id="clearDraftBtn">Clear Draft</button>
+            </div>
+
+            <div id="createOrderMessage" class="message-slot"></div>
+          </form>
+        </section>
+
+        <aside class="panel side-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Tips</p>
+              <h2>Fast workflow</h2>
+            </div>
+          </div>
+          <ul class="helper-list">
+            <li>Use item code for the most reliable item match.</li>
+            <li>Item name can be used as a fallback if code is not available.</li>
+            <li>Open the items page to push line items into the draft.</li>
+            <li>After creation, you will get a direct link to the new order detail page.</li>
+          </ul>
+          <div class="draft-panel">
+            <span class="eyebrow">Draft Items</span>
+            <strong data-draft-count>0</strong>
+            <small>Saved in your browser for this machine.</small>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

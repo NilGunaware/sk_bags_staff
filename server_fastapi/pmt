@@ -1,0 +1,9 @@
+Server 1 URL=192.168.1.59:8000
+Server 2 URL=192.168.1.52:8000
+we will put server_api in both server and get sync data from both servers in fluter app
+update flutter app
+add Order Model(Navigation Drawer)
+Show list of Order
+Show Order details
+Create Order(add on mobile no also required)
+get this details from Server 1,Server 2 and sync ItemCode,itemName (Searchable Dropdown with pagination) available quantity come from both server show total input item Quantity should be less then equals to total quantity 

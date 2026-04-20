@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import date
+import logging
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -23,12 +24,24 @@ from .schemas import (
     RootResponse,
 )
 from .runtime import static_dir
+from .db import assert_database_reachable_for_startup
 from .service import create_order, ensure_order_schema, get_order_detail, list_items, list_orders
+
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    ensure_order_schema()
+    logger.info("Running startup database check for %s at %s:%s", settings.db_name, settings.db_host, settings.db_port)
+    try:
+        assert_database_reachable_for_startup()
+        ensure_order_schema()
+    except Exception as error:
+        logger.error("Startup failed while preparing the database: %s", error)
+        raise
+
+    logger.info("Startup database check passed.")
     yield
 
 

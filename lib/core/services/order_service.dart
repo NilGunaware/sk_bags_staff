@@ -1,0 +1,177 @@
+import 'package:get/get.dart';
+
+import '../../data/models/order_models.dart';
+import '../../data/providers/api_provider.dart';
+import '../constants/api_endpoints.dart';
+
+class OrderService extends GetxService {
+  OrderService(this._apiProvider);
+
+  final ApiProvider _apiProvider;
+
+  Future<OrderListPage> fetchOrders({
+    required int page,
+    required int pageSize,
+    String entryNo = '',
+    String partyName = '',
+    String partyMobile = '',
+    String dateFrom = '',
+    String dateTo = '',
+  }) async {
+    final offset = (page - 1) * pageSize;
+    final response = await _apiProvider.post(
+      ApiEndpoints.orderRead,
+      data: <String, dynamic>{
+        'offset': offset,
+        'search': <String, dynamic>{
+          'entry_no': entryNo,
+          'date_from': dateFrom,
+          'date_to': dateTo,
+          'party_name': partyName,
+          'party_mobile': partyMobile,
+        },
+      },
+    );
+
+    final data = _dataMap(response);
+    final records = _recordList(
+      data,
+      fallback: response,
+    ).map(OrderSummaryModel.fromJson).toList();
+    final totalCount = _parseInt(data['total'] ?? response['total']);
+
+    return OrderListPage(
+      orders: records,
+      hasMore: totalCount > 0
+          ? offset + records.length < totalCount
+          : records.length >= pageSize,
+      totalCount: totalCount,
+    );
+  }
+
+  Future<OrderDetailModel> fetchOrderDetail(String orderId) async {
+    final response = await _apiProvider.get(
+      '${ApiEndpoints.orderDetail}/$orderId',
+    );
+    final data = _dataMap(response);
+
+    final summary = OrderSummaryModel.fromJson(data);
+    final itemSource =
+        data['items'] ??
+        data['record'] ??
+        data['records'] ??
+        response['items'] ??
+        response['record'] ??
+        response['records'] ??
+        const <dynamic>[];
+    final items = itemSource is List
+        ? itemSource
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    OrderItemModel.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .toList()
+        : <OrderItemModel>[];
+
+    return OrderDetailModel(summary: summary, items: items, raw: data);
+  }
+
+  Future<Map<String, dynamic>> createOrder({
+    required String uuid,
+    required int entryNo,
+    required String entryDate,
+    required String partyName,
+    required String partyMobile,
+    required List<DraftOrderItem> items,
+  }) {
+    return _apiProvider.post(
+      ApiEndpoints.orderStore,
+      data: <String, dynamic>{
+        'uuid': uuid,
+        'entry_no': entryNo,
+        'entry_date': entryDate,
+        'party_name': partyName,
+        'party_mobile': partyMobile,
+        'total_qty': items
+            .fold<int>(0, (sum, item) => sum + item.quantity)
+            .toString(),
+        'items': items
+            .map(
+              (item) => <String, dynamic>{
+                'id': 0,
+                'item_code': item.itemCode,
+                'item_name': item.itemName,
+                'qty': item.quantity,
+              },
+            )
+            .toList(),
+      },
+    );
+  }
+
+  Future<int> suggestNextEntryNo() async {
+    final result = await fetchOrders(page: 1, pageSize: 20);
+    final numbers = result.orders
+        .map((order) => int.tryParse(order.entryNo) ?? 0)
+        .where((value) => value > 0)
+        .toList();
+    if (numbers.isEmpty) {
+      return 1;
+    }
+    numbers.sort();
+    return numbers.last + 1;
+  }
+
+  bool isSuccessResponse(Map<String, dynamic> response) {
+    if (response['status'] == true || response['success'] == true) {
+      return true;
+    }
+    return response['code']?.toString() == '200';
+  }
+
+  String extractMessage(Map<String, dynamic> response) {
+    return (response['message'] ??
+            response['msg'] ??
+            response['error'] ??
+            response['response_message'] ??
+            '')
+        .toString();
+  }
+
+  Map<String, dynamic> _dataMap(Map<String, dynamic> response) {
+    final dynamic data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    return Map<String, dynamic>.from(response);
+  }
+
+  List<Map<String, dynamic>> _recordList(
+    Map<String, dynamic> data, {
+    Map<String, dynamic>? fallback,
+  }) {
+    final dynamic raw =
+        data['record'] ??
+        data['records'] ??
+        fallback?['record'] ??
+        fallback?['records'] ??
+        const <dynamic>[];
+    if (raw is List) {
+      return raw
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+}

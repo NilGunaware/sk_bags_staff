@@ -43,10 +43,19 @@ python3 desktop_app.py
 
 The desktop app will:
 
-- start the FastAPI service automatically
+- let you enter the database host/IP, port, username, password, and database name
+- save those values locally in `server_fastapi/.env`
+- call `https://interlinkpos.com/sk_bags/isactive` on startup and store the result in the launcher
+- block service startup and disable launcher controls if the licence response is `0`
+- re-check the licence automatically on every API start or restart
+- auto-start the FastAPI service on next open if saved DB settings already exist
+- let you update the DB details and restart the API with `Reconnect`
 - show live API logs
+- show the running service address in the launcher with the started IP and port
 - open the UI pages from buttons
 - stop the API when you click `Stop API And Exit` or close the window
+
+If SQL Server is not reachable, the launcher stays open and the logs will show the startup error so you can fix the server IP, port, database name, or credentials and use `Reconnect`.
 
 ## Windows EXE Build
 

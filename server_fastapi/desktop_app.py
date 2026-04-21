@@ -95,7 +95,7 @@ class LocalEnvStore:
         "DEBUG",
     ]
 
-    DB_KEYS = ["DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"]
+    CONFIG_KEYS = ["PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"]
 
     def ensure_env_file(self) -> None:
         if env_path().exists() or not env_example_path().exists():
@@ -122,10 +122,10 @@ class LocalEnvStore:
 
     def save_connection(self, connection_values: dict[str, str]) -> None:
         values = self.load_values()
-        values.update({key: value for key, value in connection_values.items() if key in self.DB_KEYS})
+        values.update({key: value for key, value in connection_values.items() if key in self.CONFIG_KEYS})
 
         if "PORT" not in values:
-            values["PORT"] = str(settings.port)
+            values["PORT"] = "8000"
         if "DB_TIMEOUT" not in values:
             values["DB_TIMEOUT"] = str(settings.db_timeout)
         if "DB_STARTUP_TIMEOUT" not in values:
@@ -430,7 +430,9 @@ class DesktopApp:
         self.service_bind_var = tk.StringVar(value="Not started")
         self.connection_note_var = tk.StringVar(value="")
         self.db_target_var = tk.StringVar(value="No saved database settings yet")
+        self.api_toggle_text_var = tk.StringVar(value="Start API")
 
+        self.service_port_var = tk.StringVar()
         self.db_host_var = tk.StringVar()
         self.db_port_var = tk.StringVar()
         self.db_user_var = tk.StringVar()
@@ -622,31 +624,25 @@ class DesktopApp:
 
         hero_button_row = ttk.Frame(hero, style="Hero.TFrame")
         hero_button_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 0))
-        for column in range(3):
+        for column in range(2):
             hero_button_row.columnconfigure(column, weight=1)
 
-        for index, (text, style_name, command, follows_license_gate) in enumerate(
-            [
-                ("Open Home", "Primary.TButton", lambda: self._open("/"), True),
-                ("Open Orders", "Secondary.TButton", lambda: self._open("/orders"), True),
-                ("Create Order", "Secondary.TButton", lambda: self._open("/orders/new"), True),
-                ("Open Items", "Secondary.TButton", lambda: self._open("/items"), True),
-                ("Swagger UI", "Secondary.TButton", lambda: self._open("/docs"), True),
-                ("Start API", "Primary.TButton", self.start_server_only, False),
-                ("Stop API", "Danger.TButton", self.stop_server_only, True),
-            ]
-        ):
-            row, column = divmod(index, 3)
-            button = ttk.Button(hero_button_row, text=text, style=style_name, command=command)
-            button.grid(
-                row=row,
-                column=column,
-                sticky="ew",
-                padx=(0 if column == 0 else 6, 0 if column == 2 else 6),
-                pady=(0 if row == 0 else 6, 0),
-            )
-            if follows_license_gate:
-                self._register_license_widget(button)
+        home_button = ttk.Button(
+            hero_button_row,
+            text="Open Home",
+            style="Secondary.TButton",
+            command=lambda: self._open("/"),
+        )
+        home_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self._register_license_widget(home_button)
+
+        self.api_toggle_button = ttk.Button(
+            hero_button_row,
+            textvariable=self.api_toggle_text_var,
+            style="Primary.TButton",
+            command=self.toggle_server,
+        )
+        self.api_toggle_button.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
         left_column = ttk.Frame(shell, style="App.TFrame")
         left_column.grid(row=1, column=0, sticky="nsew", padx=(0, 12), pady=(12, 0))
@@ -657,10 +653,10 @@ class DesktopApp:
 
         connection_card = ttk.Frame(left_column, padding=14, style="Card.TFrame")
         connection_card.pack(fill="both", expand=True)
-        ttk.Label(connection_card, text="Database Connection", style="SectionTitle.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(connection_card, text="Service & Database Connection", style="SectionTitle.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(
             connection_card,
-            text="Reconnect saves DB settings locally and restarts the API.",
+            text="Reconnect saves the service port and DB settings locally, then restarts the API.",
             style="SectionBody.TLabel",
             wraplength=320,
             justify="left",
@@ -680,11 +676,12 @@ class DesktopApp:
         form_grid.columnconfigure(1, weight=1)
         form_grid.columnconfigure(2, weight=2)
 
-        self._build_connection_field(form_grid, 0, 0, "DB Host / IP", self.db_host_var, width=16)
-        self._build_connection_field(form_grid, 0, 1, "DB Port", self.db_port_var, width=9)
-        self._build_connection_field(form_grid, 0, 2, "Database Name", self.db_name_var, width=16)
+        self._build_connection_field(form_grid, 0, 0, "Service Port", self.service_port_var, width=10)
+        self._build_connection_field(form_grid, 0, 1, "DB Host / IP", self.db_host_var, width=16)
+        self._build_connection_field(form_grid, 0, 2, "DB Port", self.db_port_var, width=9)
         self._build_connection_field(form_grid, 1, 0, "DB User", self.db_user_var, width=16)
-        self._build_connection_field(form_grid, 1, 1, "DB Password", self.db_password_var, show="*", columnspan=2, width=24)
+        self._build_connection_field(form_grid, 1, 1, "DB Password", self.db_password_var, show="*", width=14)
+        self._build_connection_field(form_grid, 1, 2, "Database Name", self.db_name_var, width=16)
 
         action_row = ttk.Frame(connection_card, style="Card.TFrame")
         action_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
@@ -862,6 +859,7 @@ class DesktopApp:
 
     def _load_connection_form(self) -> None:
         values = self.env_store.load_values()
+        self.service_port_var.set(values.get("PORT", str(settings.port or 8000)))
         self.db_host_var.set(values.get("DB_HOST", settings.db_host))
         self.db_port_var.set(values.get("DB_PORT", str(settings.db_port)))
         self.db_user_var.set(values.get("DB_USER", settings.db_user))
@@ -877,6 +875,7 @@ class DesktopApp:
 
     def _collect_connection_values(self) -> dict[str, str]:
         return {
+            "PORT": self.service_port_var.get().strip() or "8000",
             "DB_HOST": self.db_host_var.get().strip(),
             "DB_PORT": self.db_port_var.get().strip(),
             "DB_USER": self.db_user_var.get().strip(),
@@ -885,11 +884,23 @@ class DesktopApp:
         }
 
     def _validate_connection_values(self, values: dict[str, str]) -> None:
+        if not values["PORT"]:
+            raise ValueError("Service Port is required.")
+        try:
+            service_port = int(values["PORT"])
+        except ValueError as error:
+            raise ValueError("Service Port must be a number.") from error
+        if service_port <= 0 or service_port > 65535:
+            raise ValueError("Service Port must be a positive number.")
         if not values["DB_HOST"]:
             raise ValueError("DB Host / IP is required.")
         if not values["DB_PORT"]:
             raise ValueError("DB Port is required.")
-        if int(values["DB_PORT"]) <= 0:
+        try:
+            db_port = int(values["DB_PORT"])
+        except ValueError as error:
+            raise ValueError("DB Port must be a number.") from error
+        if db_port <= 0 or db_port > 65535:
             raise ValueError("DB Port must be a positive number.")
         if not values["DB_USER"]:
             raise ValueError("DB User is required.")
@@ -931,6 +942,14 @@ class DesktopApp:
         if not self.server_manager.start() and LICENSE_IS_ACTIVE is not True:
             self.connection_note_var.set("Licence is expired. Contact to developer.")
 
+    def toggle_server(self) -> None:
+        is_running = bool(self.server_manager.server_thread and self.server_manager.server_thread.is_alive())
+        if is_running or self.server_manager.status in {"Live", "Starting"}:
+            self.stop_server_only()
+            return
+
+        self.start_server_only()
+
     def reconnect_with_form_values(self) -> None:
         try:
             values = self._collect_connection_values()
@@ -947,7 +966,8 @@ class DesktopApp:
         self._update_connection_summary()
         self.connection_note_var.set("Saved locally. Reconnecting service...")
         self.server_manager.log(
-            f"Saved database settings for {settings.db_host}:{settings.db_port}/{settings.db_name}. Reconnecting API."
+            f"Saved service port {settings.port} and database settings for "
+            f"{settings.db_host}:{settings.db_port}/{settings.db_name}. Reconnecting API."
         )
         self.server_manager.stop()
         time.sleep(0.4)
@@ -955,9 +975,6 @@ class DesktopApp:
             self.connection_note_var.set("Licence is expired. Contact to developer.")
 
     def stop_server_only(self) -> None:
-        if LICENSE_IS_ACTIVE is not True:
-            self.server_manager.log("Stop API is disabled because the licence is expired.")
-            return
         self.server_manager.stop()
         self.connection_note_var.set("API stopped. Click Reconnect to start again.")
 
@@ -982,6 +999,7 @@ class DesktopApp:
         self.url_var.set(self.server_manager.base_url)
 
         self._set_license_controls_enabled(LICENSE_IS_ACTIVE is True)
+        self._refresh_api_toggle_button()
 
         if self.server_manager.status == "Live":
             self.service_bind_var.set(self.server_manager.base_url)
@@ -1003,6 +1021,24 @@ class DesktopApp:
         self.service_bind_label.configure(style=service_style)
         self._update_connection_summary()
         self.root.after(350, self._refresh_status)
+
+    def _refresh_api_toggle_button(self) -> None:
+        status = self.server_manager.status
+        if status in {"Live", "Starting"}:
+            self.api_toggle_text_var.set("Stop API")
+            self.api_toggle_button.configure(style="Danger.TButton")
+            self.api_toggle_button.state(["!disabled"])
+            return
+
+        if status == "Stopping":
+            self.api_toggle_text_var.set("Stopping...")
+            self.api_toggle_button.configure(style="Danger.TButton")
+            self.api_toggle_button.state(["disabled"])
+            return
+
+        self.api_toggle_text_var.set("Start API")
+        self.api_toggle_button.configure(style="Primary.TButton")
+        self.api_toggle_button.state(["!disabled"])
 
     def _open(self, path: str) -> None:
         if LICENSE_IS_ACTIVE is not True:

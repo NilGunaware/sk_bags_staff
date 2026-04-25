@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../routes/app_routes.dart';
@@ -48,6 +49,8 @@ class HomeView extends GetView<HomeController> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context, user),
+              const SizedBox(height: 14),
+              _buildServerHealthCard(),
               _buildScannerCard(context),
               const SizedBox(height: 24),
               _buildStockList(context),
@@ -186,7 +189,7 @@ class HomeView extends GetView<HomeController> {
                                     ),
                                   ),
                                   subtitle: const Text(
-                                    'Remote order list and create order',
+                                    'Order list and create order',
                                   ),
                                   onTap: () {
                                     Get.back();
@@ -298,6 +301,94 @@ class HomeView extends GetView<HomeController> {
         ],
       ),
     );
+  }
+
+  Widget _buildServerHealthCard() {
+    return Obx(() {
+      final states = controller.serverHealthStates;
+      final lastChecked = controller.lastServerHealthCheck.value;
+      final isChecking = controller.isCheckingServerHealth.value;
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.accent),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Server Health',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                if (isChecking)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                else
+                  IconButton(
+                    onPressed: () =>
+                        controller.checkItemServersHealth(showLoading: true),
+                    icon: const Icon(Icons.refresh, color: AppColors.primary),
+                    tooltip: 'Refresh server health',
+                  ),
+              ],
+            ),
+            Text(
+              lastChecked == null
+                  ? 'Checking ${ApiEndpoints.ahmLabel} and ${ApiEndpoints.bhuLabel}...'
+                  : 'Last checked: ${lastChecked.hour.toString().padLeft(2, '0')}:${lastChecked.minute.toString().padLeft(2, '0')}:${lastChecked.second.toString().padLeft(2, '0')}',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _ServerHealthTile(
+                    label: ApiEndpoints.ahmLabel,
+                    isOnline: states[ApiEndpoints.ahmLabel],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ServerHealthTile(
+                    label: ApiEndpoints.bhuLabel,
+                    isOnline: states[ApiEndpoints.bhuLabel],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildScannerCard(BuildContext context) {
@@ -1142,5 +1233,74 @@ class HomeView extends GetView<HomeController> {
       controller.scanCodeController.text = scannedValue;
       await controller.scanItemCamera();
     }
+  }
+}
+
+class _ServerHealthTile extends StatelessWidget {
+  const _ServerHealthTile({required this.label, required this.isOnline});
+
+  final String label;
+  final bool? isOnline;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color dotColor;
+    final String statusText;
+
+    if (isOnline == true) {
+      dotColor = const Color(0xFF1F9D55);
+      statusText = 'Running';
+    } else if (isOnline == false) {
+      dotColor = const Color(0xFFD64545);
+      statusText = 'Stopped';
+    } else {
+      dotColor = Colors.grey;
+      statusText = 'Checking';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    color: isOnline == true
+                        ? const Color(0xFF1F9D55)
+                        : isOnline == false
+                        ? const Color(0xFFD64545)
+                        : Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

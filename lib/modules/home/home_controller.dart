@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -29,7 +30,9 @@ class HomeController extends GetxController {
   final scanCodeFocusNode = FocusNode();
   final isStoring = false.obs;
   final showStoreForm = false.obs;
-  final storeUuidController = TextEditingController(text: '${DateTime.now().millisecondsSinceEpoch}');
+  final storeUuidController = TextEditingController(
+    text: '${DateTime.now().millisecondsSinceEpoch}',
+  );
   final storeQuantityController = TextEditingController(text: '1');
   final storeNotesController = TextEditingController();
 
@@ -37,6 +40,14 @@ class HomeController extends GetxController {
   final stockList = <Map<String, dynamic>>[].obs;
   final stockOffset = 0.obs;
   final stockTotal = 0.obs;
+  final serverHealthStates = <String, bool?>{
+    ApiEndpoints.ahmLabel: null,
+    ApiEndpoints.bhuLabel: null,
+  }.obs;
+  final isCheckingServerHealth = false.obs;
+  final lastServerHealthCheck = Rxn<DateTime>();
+
+  Timer? _serverHealthTimer;
 
   bool canDeleteStockItem(Map<String, dynamic> item) {
     return item['is_delete']?.toString() == '1';
@@ -62,15 +73,25 @@ class HomeController extends GetxController {
           'quantity': {'from': '', 'to': ''},
         },
       };
-      final response = await _apiProvider.post(ApiEndpoints.stockRead, data: payload);
-      final ok = ApiResponseHandler.handleResponse(response, showSuccessMessage: false);
+      final response = await _apiProvider.post(
+        ApiEndpoints.stockRead,
+        data: payload,
+      );
+      final ok = ApiResponseHandler.handleResponse(
+        response,
+        showSuccessMessage: false,
+      );
       if (ok) {
-        final data = response['data'] is Map<String, dynamic> ? Map<String, dynamic>.from(response['data'] as Map) : <String, dynamic>{};
+        final data = response['data'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(response['data'] as Map)
+            : <String, dynamic>{};
 
         stockTotal.value = int.tryParse(data['total']?.toString() ?? '0') ?? 0;
         final records = data['record'];
         if (records is List) {
-          final list = records.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          final list = records
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
           stockList.addAll(list);
           stockOffset.value += list.length;
         }
@@ -86,7 +107,7 @@ class HomeController extends GetxController {
     if (!canDeleteStockItem(item)) return false;
     final id = item['id']?.toString() ?? '';
     if (id.isEmpty) return false;
-    
+
     isDeletingItem.value = true;
     try {
       return await deleteStockItem(id);
@@ -105,11 +126,22 @@ class HomeController extends GetxController {
     isStoring.value = true;
     try {
       if (scanResult.value == null || scanResult.value!.isEmpty) {
-        final payload = {'qrcode': scanQrcodeController.text.trim(), 'code': scanCodeController.text.trim()};
-        final response = await _apiProvider.post(ApiEndpoints.scanQrcode, data: payload);
-        final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true);
+        final payload = {
+          'qrcode': scanQrcodeController.text.trim(),
+          'code': scanCodeController.text.trim(),
+        };
+        final response = await _apiProvider.post(
+          ApiEndpoints.scanQrcode,
+          data: payload,
+        );
+        final ok = ApiResponseHandler.handleResponse(
+          response,
+          showErrorMessage: true,
+        );
         if (!ok) return;
-        final data = response['data'] is Map<String, dynamic> ? Map<String, dynamic>.from(response['data'] as Map) : <String, dynamic>{};
+        final data = response['data'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(response['data'] as Map)
+            : <String, dynamic>{};
         scanResult.value = data;
         showStoreForm.value = true;
       }
@@ -120,15 +152,29 @@ class HomeController extends GetxController {
         ApiResponseHandler.showErrorSnackbar('Invalid item');
         return;
       }
-      final payloadStore = {'uuid': storeUuidController.text.trim().isEmpty ? '${DateTime.now().millisecondsSinceEpoch}' : storeUuidController.text.trim(), 'item_id': itemId, 'item_code': itemCode, 'quantity': qtyStr, 'notes': storeNotesController.text.trim()};
-      final responseStore = await _apiProvider.post(ApiEndpoints.stockStoreCreate, data: payloadStore);
-      final okStore = ApiResponseHandler.handleResponse(responseStore, showErrorMessage: true);
+      final payloadStore = {
+        'uuid': storeUuidController.text.trim().isEmpty
+            ? '${DateTime.now().millisecondsSinceEpoch}'
+            : storeUuidController.text.trim(),
+        'item_id': itemId,
+        'item_code': itemCode,
+        'quantity': qtyStr,
+        'notes': storeNotesController.text.trim(),
+      };
+      final responseStore = await _apiProvider.post(
+        ApiEndpoints.stockStoreCreate,
+        data: payloadStore,
+      );
+      final okStore = ApiResponseHandler.handleResponse(
+        responseStore,
+        showErrorMessage: true,
+      );
       if (okStore) {
         resetScanner();
         // Add a small delay to ensure backend has processed the transaction
         await Future.delayed(const Duration(milliseconds: 500));
         await fetchStockList(refresh: true);
-        
+
         // Request focus back to code input field
         scanCodeFocusNode.requestFocus();
       }
@@ -143,7 +189,11 @@ class HomeController extends GetxController {
     try {
       final url = '${ApiEndpoints.stockRemove}/$id';
       final response = await _apiProvider.delete(url);
-      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true, showSuccessMessage: false);
+      final ok = ApiResponseHandler.handleResponse(
+        response,
+        showErrorMessage: true,
+        showSuccessMessage: false,
+      );
       if (ok) {
         await fetchStockList(refresh: true);
         return true;
@@ -169,9 +219,14 @@ class HomeController extends GetxController {
     isProfileLoading.value = true;
     try {
       final response = await _apiProvider.get(ApiEndpoints.getProfile);
-      final ok = ApiResponseHandler.handleResponse(response, showSuccessMessage: false);
+      final ok = ApiResponseHandler.handleResponse(
+        response,
+        showSuccessMessage: false,
+      );
       if (ok) {
-        final data = response['data'] is Map<String, dynamic> ? Map<String, dynamic>.from(response['data'] as Map) : <String, dynamic>{};
+        final data = response['data'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(response['data'] as Map)
+            : <String, dynamic>{};
         if (data.containsKey('iss')) {
           data['iss'] = _sanitizeUrl(data['iss']?.toString());
         }
@@ -187,11 +242,22 @@ class HomeController extends GetxController {
   Future<void> scanItem({bool viaCamera = false}) async {
     isScanning.value = true;
     try {
-      final payload = {'qrcode': scanQrcodeController.text.trim(), 'code': scanCodeController.text.trim()};
-      final response = await _apiProvider.post(ApiEndpoints.scanQrcode, data: payload);
-      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: true);
+      final payload = {
+        'qrcode': scanQrcodeController.text.trim(),
+        'code': scanCodeController.text.trim(),
+      };
+      final response = await _apiProvider.post(
+        ApiEndpoints.scanQrcode,
+        data: payload,
+      );
+      final ok = ApiResponseHandler.handleResponse(
+        response,
+        showErrorMessage: true,
+      );
       if (ok) {
-        final data = response['data'] is Map<String, dynamic> ? Map<String, dynamic>.from(response['data'] as Map) : <String, dynamic>{};
+        final data = response['data'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(response['data'] as Map)
+            : <String, dynamic>{};
         scanResult.value = data;
         showStoreForm.value = !viaCamera;
         if (viaCamera) {
@@ -233,19 +299,65 @@ class HomeController extends GetxController {
   Future<void> _downloadFile(String link) async {
     try {
       final name = link.split('/').isNotEmpty ? link.split('/').last : '';
-      final fileName = name.isEmpty ? '${DateTime.now().millisecondsSinceEpoch}.file' : name;
+      final fileName = name.isEmpty
+          ? '${DateTime.now().millisecondsSinceEpoch}.file'
+          : name;
       final dir = Directory.systemTemp;
       final filePath = '${dir.path}${Platform.pathSeparator}$fileName';
       final dio = Dio();
       final response = await dio.get<List<int>>(
         link,
-        options: Options(responseType: ResponseType.bytes, followRedirects: true, validateStatus: (status) => status != null && status < 500),
+        options: Options(
+          responseType: ResponseType.bytes,
+          followRedirects: true,
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
       final bytes = response.data ?? <int>[];
       await File(filePath).writeAsBytes(bytes);
       ApiResponseHandler.showSuccessSnackbar('Downloaded: $fileName');
     } catch (_) {
       ApiResponseHandler.showErrorSnackbar('Download failed');
+    }
+  }
+
+  Future<void> checkItemServersHealth({bool showLoading = false}) async {
+    if (showLoading) {
+      isCheckingServerHealth.value = true;
+    }
+
+    try {
+      final results = await Future.wait<bool>([
+        _checkServerHealth(ApiEndpoints.ahmItemsBaseUrl),
+        _checkServerHealth(ApiEndpoints.bhuItemsBaseUrl),
+      ]);
+
+      serverHealthStates.assignAll(<String, bool?>{
+        ApiEndpoints.ahmLabel: results[0],
+        ApiEndpoints.bhuLabel: results[1],
+      });
+      lastServerHealthCheck.value = DateTime.now();
+    } finally {
+      isCheckingServerHealth.value = false;
+    }
+  }
+
+  Future<bool> _checkServerHealth(String baseUrl) async {
+    try {
+      final response = await Dio().get<Map<String, dynamic>>(
+        '$baseUrl/health',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5),
+          headers: const <String, dynamic>{'Accept': 'application/json'},
+        ),
+      );
+
+      return response.statusCode != null &&
+          response.statusCode! >= 200 &&
+          response.statusCode! < 300;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -283,9 +395,23 @@ class HomeController extends GetxController {
     }
     isStoring.value = true;
     try {
-      final payload = {'uuid': storeUuidController.text.trim().isEmpty ? '${DateTime.now().millisecondsSinceEpoch}' : storeUuidController.text.trim(), 'item_id': itemId, 'item_code': itemCode, 'quantity': qtyStr, 'notes': storeNotesController.text.trim()};
-      final response = await _apiProvider.post(ApiEndpoints.stockStoreCreate, data: payload);
-      final ok = ApiResponseHandler.handleResponse(response, showErrorMessage: false);
+      final payload = {
+        'uuid': storeUuidController.text.trim().isEmpty
+            ? '${DateTime.now().millisecondsSinceEpoch}'
+            : storeUuidController.text.trim(),
+        'item_id': itemId,
+        'item_code': itemCode,
+        'quantity': qtyStr,
+        'notes': storeNotesController.text.trim(),
+      };
+      final response = await _apiProvider.post(
+        ApiEndpoints.stockStoreCreate,
+        data: payload,
+      );
+      final ok = ApiResponseHandler.handleResponse(
+        response,
+        showErrorMessage: false,
+      );
       if (ok) {
         if (resetAfter) {
           resetScanner();
@@ -305,10 +431,16 @@ class HomeController extends GetxController {
     super.onInit();
     fetchProfile();
     fetchStockList(refresh: true);
+    checkItemServersHealth(showLoading: true);
+    _serverHealthTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => checkItemServersHealth(),
+    );
   }
 
   @override
   void onClose() {
+    _serverHealthTimer?.cancel();
     scanQrcodeController.dispose();
     scanCodeController.dispose();
     scanCodeFocusNode.dispose();

@@ -39,17 +39,17 @@ class AppPages {
     GetPage(
       name: Routes.orders,
       page: () => const OrderListView(),
-      binding: OrdersBinding(),
+      binding: OrderListBinding(),
     ),
     GetPage(
       name: Routes.orderCreate,
       page: () => const OrderCreateView(),
-      binding: OrdersBinding(),
+      binding: OrderCreateBinding(),
     ),
     GetPage(
       name: Routes.orderDetail,
       page: () => const OrderDetailView(),
-      binding: OrdersBinding(),
+      binding: OrderDetailBinding(),
     ),
   ];
 }

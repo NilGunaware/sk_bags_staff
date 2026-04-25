@@ -9,7 +9,8 @@ import '../../data/models/order_models.dart';
 
 class OrderCreateController extends GetxController {
   final OrderService _orderService = Get.find<OrderService>();
-  final LocalItemSyncService _itemSyncService = Get.find<LocalItemSyncService>();
+  final LocalItemSyncService _itemSyncService =
+      Get.find<LocalItemSyncService>();
 
   final formKey = GlobalKey<FormState>();
   final partyNameController = TextEditingController();
@@ -71,8 +72,26 @@ class OrderCreateController extends GetxController {
       pageSize: pageSize,
       query: query,
     );
-    syncWarnings.assignAll(result.warnings);
+    syncWarnings.assignAll(result.items.isEmpty ? result.warnings : <String>[]);
     return result;
+  }
+
+  MergedItemPage filterLoadedItems({
+    required Iterable<MergedItemModel> items,
+    required int page,
+    required int pageSize,
+    required String query,
+    List<String> warnings = const <String>[],
+    bool forceHasMore = false,
+  }) {
+    return _itemSyncService.filterLoadedItems(
+      items: items,
+      page: page,
+      pageSize: pageSize,
+      query: query,
+      warnings: warnings,
+      forceHasMore: forceHasMore,
+    );
   }
 
   int selectedQuantityFor(MergedItemModel item) {
@@ -146,10 +165,12 @@ class OrderCreateController extends GetxController {
 
       if (_orderService.isSuccessResponse(response)) {
         final message = _orderService.extractMessage(response);
-        ApiResponseHandler.showSuccessSnackbar(
-          message.isEmpty ? 'Order created successfully' : message,
+        Get.back<Map<String, dynamic>>(
+          result: <String, dynamic>{
+            'created': true,
+            'message': message.isEmpty ? 'Order created successfully' : message,
+          },
         );
-        Get.back(result: true);
       } else {
         ApiResponseHandler.showErrorSnackbar(
           _orderService.extractMessage(response).isEmpty
@@ -163,6 +184,6 @@ class OrderCreateController extends GetxController {
   }
 
   List<TextInputFormatter> get mobileFormatters => <TextInputFormatter>[
-        FilteringTextInputFormatter.digitsOnly,
-      ];
+    FilteringTextInputFormatter.digitsOnly,
+  ];
 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import queue
 import shutil
 import sys
@@ -693,6 +694,14 @@ class DesktopApp:
         )
         load_button.pack(side="left")
         self._register_license_widget(load_button)
+        save_button = ttk.Button(
+            action_row,
+            text="Save",
+            style="Secondary.TButton",
+            command=self.save_form_values_locally,
+        )
+        save_button.pack(side="left", padx=(10, 0))
+        self._register_license_widget(save_button)
         reconnect_button = ttk.Button(
             action_row,
             text="Reconnect",
@@ -865,6 +874,7 @@ class DesktopApp:
         self.db_user_var.set(values.get("DB_USER", settings.db_user))
         self.db_password_var.set(values.get("DB_PASSWORD", settings.db_password))
         self.db_name_var.set(values.get("DB_NAME", settings.db_name))
+        self._apply_runtime_connection_values(self._collect_connection_values())
         self._update_connection_summary()
 
     def _update_connection_summary(self) -> None:
@@ -872,6 +882,12 @@ class DesktopApp:
         port = self.db_port_var.get().strip() or "-"
         database = self.db_name_var.get().strip() or "-"
         self.db_target_var.set(f"{host}:{port}\n{database}")
+
+    def _apply_runtime_connection_values(self, values: dict[str, str]) -> None:
+        for key in self.env_store.CONFIG_KEYS:
+            os.environ[key] = values.get(key, "")
+        settings.reload()
+        self.url_var.set(self.server_manager.base_url)
 
     def _collect_connection_values(self) -> dict[str, str]:
         return {
@@ -931,6 +947,29 @@ class DesktopApp:
         self.connection_note_var.set("Loaded saved settings from local .env.")
         self.server_manager.log("Loaded saved database settings into the form.")
 
+    def save_form_values_locally(self) -> None:
+        if LICENSE_IS_ACTIVE is not True:
+            self.server_manager.log("Save is blocked because the licence is expired.")
+            return
+
+        try:
+            values = self._collect_connection_values()
+            self._validate_connection_values(values)
+        except Exception as error:
+            self.connection_note_var.set(str(error))
+            self.server_manager.log(str(error))
+            self.server_manager.status = "Config Error"
+            return
+
+        self.env_store.save_connection(values)
+        self._apply_runtime_connection_values(values)
+        self._update_connection_summary()
+        self.connection_note_var.set("Saved locally. Current form values were stored in .env.")
+        self.server_manager.log(
+            f"Saved service port {settings.port} and database settings for "
+            f"{settings.db_host}:{settings.db_port}/{settings.db_name} locally."
+        )
+
     def start_server_only(self) -> None:
         if not self.env_store.has_saved_connection():
             self.connection_note_var.set("Enter DB settings and click Reconnect.")
@@ -961,8 +1000,7 @@ class DesktopApp:
             return
 
         self.env_store.save_connection(values)
-        settings.reload()
-        self.url_var.set(self.server_manager.base_url)
+        self._apply_runtime_connection_values(values)
         self._update_connection_summary()
         self.connection_note_var.set("Saved locally. Reconnecting service...")
         self.server_manager.log(

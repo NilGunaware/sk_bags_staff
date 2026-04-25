@@ -7,17 +7,41 @@ import 'order_create_controller.dart';
 import 'order_detail_controller.dart';
 import 'order_list_controller.dart';
 
-class OrdersBinding extends Bindings {
+class OrdersDependenciesBinding extends Bindings {
   @override
   void dependencies() {
     Get.lazyPut<ApiProvider>(() => ApiProvider(), fenix: true);
-    Get.lazyPut<LocalItemSyncService>(() => LocalItemSyncService(), fenix: true);
+    Get.lazyPut<LocalItemSyncService>(
+      () => LocalItemSyncService(),
+      fenix: true,
+    );
     Get.lazyPut<OrderService>(
       () => OrderService(Get.find<ApiProvider>()),
       fenix: true,
     );
+  }
+}
+
+class OrderListBinding extends Bindings {
+  @override
+  void dependencies() {
+    OrdersDependenciesBinding().dependencies();
     Get.lazyPut<OrderListController>(() => OrderListController());
+  }
+}
+
+class OrderDetailBinding extends Bindings {
+  @override
+  void dependencies() {
+    OrdersDependenciesBinding().dependencies();
     Get.lazyPut<OrderDetailController>(() => OrderDetailController());
+  }
+}
+
+class OrderCreateBinding extends Bindings {
+  @override
+  void dependencies() {
+    OrdersDependenciesBinding().dependencies();
     Get.lazyPut<OrderCreateController>(() => OrderCreateController());
   }
 }

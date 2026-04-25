@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
 import '../../data/providers/api_provider.dart';
 import '../constants/api_endpoints.dart';
@@ -32,6 +33,7 @@ class OrderService extends GetxService {
         },
       },
     );
+    _ensureOrderResponseOk(response, fallbackMessage: 'Could not load orders.');
 
     final data = _dataMap(response);
     final records = _recordList(
@@ -52,6 +54,10 @@ class OrderService extends GetxService {
   Future<OrderDetailModel> fetchOrderDetail(String orderId) async {
     final response = await _apiProvider.get(
       '${ApiEndpoints.orderDetail}/$orderId',
+    );
+    _ensureOrderResponseOk(
+      response,
+      fallbackMessage: 'Could not load order details.',
     );
     final data = _dataMap(response);
 
@@ -173,5 +179,24 @@ class OrderService extends GetxService {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  void _ensureOrderResponseOk(
+    Map<String, dynamic> response, {
+    required String fallbackMessage,
+  }) {
+    final status = response['status'];
+    final success = response['success'];
+    final code = response['code']?.toString();
+
+    final isOk =
+        status == true || success == true || code == null || code == '200';
+
+    if (isOk) {
+      return;
+    }
+
+    final message = extractMessage(response).trim();
+    throw ApiException(message.isEmpty ? fallbackMessage : message);
   }
 }

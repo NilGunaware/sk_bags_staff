@@ -59,7 +59,7 @@ class MyApp extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size(0, 48),
           ),
         ),
         inputDecorationTheme: const InputDecorationTheme(

@@ -38,7 +38,8 @@ class OrderSummaryModel {
       entryNo: (json['entry_no'] ?? json['entryNo'] ?? '').toString(),
       entryDate: (json['entry_date'] ?? json['date'] ?? '').toString(),
       partyName: (json['party_name'] ?? json['partyName'] ?? '').toString(),
-      partyMobile: (json['party_mobile'] ?? json['partyMobile'] ?? '').toString(),
+      partyMobile: (json['party_mobile'] ?? json['partyMobile'] ?? '')
+          .toString(),
       totalQty: _parseInt(json['total_qty'] ?? json['totalQty'] ?? json['qty']),
       raw: Map<String, dynamic>.from(json),
     );
@@ -77,7 +78,17 @@ class OrderItemModel {
           .toString(),
       itemName: (json['item_name'] ?? json['itemName'] ?? json['name'] ?? '')
           .toString(),
-      quantity: _parseInt(json['qty'] ?? json['quantity']),
+      quantity: _parseInt(
+        json['qty'] ??
+            json['quantity'] ??
+            json['item_qty'] ??
+            json['itemQuantity'] ??
+            json['item_quantity'] ??
+            json['order_qty'] ??
+            json['orderQuantity'] ??
+            json['total_qty'] ??
+            json['totalQty'],
+      ),
     );
   }
 }
@@ -100,19 +111,19 @@ class MergedItemModel {
     required this.itemName,
     required this.totalQuantity,
     required this.serverQuantities,
+    this.qrCode,
   });
 
   final String itemCode;
   final String itemName;
   final int totalQuantity;
   final Map<String, int> serverQuantities;
+  final String? qrCode;
 
   String get key => '${itemCode.trim()}|${itemName.trim()}';
 
   MergedItemModel merge(MergedItemModel other) {
-    final mergedQuantities = <String, int>{
-      ...serverQuantities,
-    };
+    final mergedQuantities = <String, int>{...serverQuantities};
 
     other.serverQuantities.forEach((server, quantity) {
       mergedQuantities[server] = (mergedQuantities[server] ?? 0) + quantity;
@@ -123,6 +134,7 @@ class MergedItemModel {
       itemName: itemName,
       totalQuantity: totalQuantity + other.totalQuantity,
       serverQuantities: mergedQuantities,
+      qrCode: (qrCode?.trim().isNotEmpty ?? false) ? qrCode : other.qrCode,
     );
   }
 
@@ -138,9 +150,8 @@ class MergedItemModel {
       itemCode: (json['itemCode'] ?? json['item_code'] ?? '').toString(),
       itemName: (json['itemName'] ?? json['item_name'] ?? '').toString(),
       totalQuantity: quantity,
-      serverQuantities: <String, int>{
-        serverName: quantity,
-      },
+      serverQuantities: <String, int>{serverName: quantity},
+      qrCode: _parseNullableString(json['qrCode'] ?? json['qr_code']),
     );
   }
 }
@@ -178,5 +189,14 @@ class DraftOrderItem {
 int _parseInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
-  return int.tryParse(value?.toString() ?? '') ?? 0;
+  final text = value?.toString().trim() ?? '';
+  if (text.isEmpty) {
+    return 0;
+  }
+  return int.tryParse(text) ?? double.tryParse(text)?.toInt() ?? 0;
+}
+
+String? _parseNullableString(dynamic value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
 }

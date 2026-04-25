@@ -21,17 +21,28 @@ class OrderListController extends GetxController {
   final fromDate = Rxn<DateTime>();
   final toDate = Rxn<DateTime>();
   final errorMessage = RxnString();
+  final filtersExpanded = false.obs;
+  final filtersVersion = 0.obs;
 
   static const int pageSize = 20;
+  late final Worker _fromDateWatcher;
+  late final Worker _toDateWatcher;
 
   @override
   void onInit() {
     super.onInit();
+    entryNoController.addListener(_markFiltersDirty);
+    partyNameController.addListener(_markFiltersDirty);
+    partyMobileController.addListener(_markFiltersDirty);
+    _fromDateWatcher = ever<DateTime?>(fromDate, (_) => _markFiltersDirty());
+    _toDateWatcher = ever<DateTime?>(toDate, (_) => _markFiltersDirty());
     fetchOrders(refresh: true);
   }
 
   @override
   void onClose() {
+    _fromDateWatcher.dispose();
+    _toDateWatcher.dispose();
     entryNoController.dispose();
     partyNameController.dispose();
     partyMobileController.dispose();
@@ -78,7 +89,7 @@ class OrderListController extends GetxController {
         page.value++;
       }
     } catch (error) {
-      errorMessage.value = error.toString();
+      errorMessage.value = _friendlyOrderListMessage(error);
       ApiResponseHandler.showErrorSnackbar('Could not load orders');
     } finally {
       isLoading.value = false;
@@ -87,6 +98,8 @@ class OrderListController extends GetxController {
   }
 
   Future<void> refreshOrders() => fetchOrders(refresh: true);
+
+  void toggleFilters() => filtersExpanded.toggle();
 
   void clearFilters() {
     entryNoController.clear();
@@ -104,10 +117,57 @@ class OrderListController extends GetxController {
         '${value.year}';
   }
 
+  int get activeFilterCount {
+    var count = 0;
+    if (entryNoController.text.trim().isNotEmpty) count++;
+    if (partyNameController.text.trim().isNotEmpty) count++;
+    if (partyMobileController.text.trim().isNotEmpty) count++;
+    if (fromDate.value != null) count++;
+    if (toDate.value != null) count++;
+    return count;
+  }
+
+  bool get hasActiveFilters => activeFilterCount > 0;
+
+  void _markFiltersDirty() {
+    filtersVersion.value++;
+  }
+
   String _formatApiDate(DateTime? value) {
     if (value == null) return '';
     return '${value.year}-'
         '${value.month.toString().padLeft(2, '0')}-'
         '${value.day.toString().padLeft(2, '0')}';
+  }
+
+  String _friendlyOrderListMessage(Object error) {
+    final text = error.toString().trim();
+    if (text.isEmpty) {
+      return 'Orders are unavailable right now. Please try again.';
+    }
+
+    final lower = text.toLowerCase();
+    if (lower.contains('socket') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('connection') ||
+        lower.contains('timeout')) {
+      return 'Orders are unavailable right now. Please check your connection and try again.';
+    }
+
+    if (lower.contains('invalid response') ||
+        lower.contains('unexpected character') ||
+        lower.contains('formatexception')) {
+      return 'The order service returned an invalid response. Please try again shortly.';
+    }
+
+    if (lower.contains('exception') ||
+        lower.contains('sql') ||
+        lower.contains('syntax') ||
+        lower.contains('trace') ||
+        lower.contains('stack')) {
+      return 'Orders are unavailable right now. Please try again shortly.';
+    }
+
+    return text;
   }
 }

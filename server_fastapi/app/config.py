@@ -28,6 +28,7 @@ class Settings:
     db_startup_timeout: int = 8
     default_page_size: int = 20
     max_page_size: int = 100
+    photo_dir: str = "E:/PHOTO"
     debug: bool = False
 
     def reload(self) -> "Settings":
@@ -54,6 +55,7 @@ class Settings:
         self.db_startup_timeout = int(get_value("DB_STARTUP_TIMEOUT", "8"))
         self.default_page_size = int(get_value("DEFAULT_PAGE_SIZE", "20"))
         self.max_page_size = int(get_value("MAX_PAGE_SIZE", "100"))
+        self.photo_dir = get_value("PHOTO_DIR", "E:/PHOTO")
         self.debug = _env_bool(get_value("DEBUG", "false"), False)
         return self
 

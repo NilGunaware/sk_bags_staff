@@ -33,10 +33,10 @@
       <section class="page-hero">
         <div>
           <p class="eyebrow">Items</p>
-          <h1>Browse items and send them into an order draft.</h1>
+          <h1>Browse items, inspect complete BUSY detail, and send them into an order draft.</h1>
           <p class="hero-text">
-            This page is focused only on item search. Use filters and pagination here, then move selected items
-            into the create-order page through the draft flow.
+            Search by item code, item name, or QR code. We treat `QR Code = Item Code` for lookup, then show
+            stock, HSN, support codes, price rows, discount, final price, and image when available.
           </p>
         </div>
         <div class="hero-actions">
@@ -45,77 +45,112 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">Search</p>
-            <h2>Item filters</h2>
+      <section class="panel-grid">
+        <div class="section-stack">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Search</p>
+                <h2>Item filters</h2>
+              </div>
+              <span class="meta-chip" id="itemsMeta">Loading...</span>
+            </div>
+
+            <form id="itemsFilterForm" class="field-grid field-grid-compact">
+              <label>
+                <span>Item Code</span>
+                <input type="text" id="itemsItemCode" placeholder="44593" />
+              </label>
+              <label>
+                <span>Item Name</span>
+                <input type="text" id="itemsItemName" placeholder="BackPack" />
+              </label>
+              <label>
+                <span>QR Code</span>
+                <input type="text" id="itemsQrCode" placeholder="Same as item code" />
+              </label>
+              <label>
+                <span>Page Size</span>
+                <select id="itemsPageSize">
+                  <option value="5">5</option>
+                  <option value="10" selected>10</option>
+                  <option value="20">20</option>
+                </select>
+              </label>
+              <div class="action-row">
+                <button class="btn btn-primary" type="submit">Apply Filters</button>
+                <button class="btn btn-secondary" type="button" id="itemsResetBtn">Reset</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Results</p>
+                <h2>Item list</h2>
+              </div>
+              <span class="meta-chip" id="qrStatusChip">Waiting...</span>
+            </div>
+
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item Code</th>
+                    <th>Item Name</th>
+                    <th>Group</th>
+                    <th>Qty</th>
+                    <th>Price Rows</th>
+                    <th>Price Range</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="itemsTableBody">
+                  <tr>
+                    <td class="empty" colspan="7">Loading items...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pager">
+              <button class="btn btn-secondary" id="itemsPrevBtn" type="button">Previous</button>
+              <span id="itemsPaginationText">Page 1</span>
+              <button class="btn btn-secondary" id="itemsNextBtn" type="button">Next</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">BUSY Pricing</p>
+                <h2>Price category list</h2>
+                <p class="panel-copy">
+                  Active category names, slot IDs, discounted coverage, and final price ranges from the current
+                  company database.
+                </p>
+              </div>
+              <span class="meta-chip" id="itemsPriceCategoriesMeta">Loading...</span>
+            </div>
+            <div id="itemsPriceCategoriesPanel">
+              <p class="muted-copy">Loading price categories...</p>
+            </div>
+          </section>
+        </div>
+
+        <aside class="panel side-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Detail</p>
+              <h2>Complete item details</h2>
+            </div>
+            <span class="meta-chip" id="itemDetailMeta">Waiting...</span>
           </div>
-          <span class="meta-chip" id="itemsMeta">Loading...</span>
-        </div>
-
-        <form id="itemsFilterForm" class="field-grid field-grid-compact">
-          <label>
-            <span>Item Code</span>
-            <input type="text" id="itemsItemCode" placeholder="44593" />
-          </label>
-          <label>
-            <span>Item Name</span>
-            <input type="text" id="itemsItemName" placeholder="BackPack" />
-          </label>
-          <label>
-            <span>QR Code</span>
-            <input type="text" id="itemsQrCode" placeholder="Only if available in DB" />
-          </label>
-          <label>
-            <span>Page Size</span>
-            <select id="itemsPageSize">
-              <option value="5">5</option>
-              <option value="10" selected>10</option>
-              <option value="20">20</option>
-            </select>
-          </label>
-          <div class="action-row">
-            <button class="btn btn-primary" type="submit">Apply Filters</button>
-            <button class="btn btn-secondary" type="button" id="itemsResetBtn">Reset</button>
+          <div id="itemDetailPanel" class="section-stack">
+            <p class="muted-copy">Select an item row to load complete BUSY detail.</p>
           </div>
-        </form>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">Results</p>
-            <h2>Item list</h2>
-          </div>
-          <span class="meta-chip" id="qrStatusChip">Waiting...</span>
-        </div>
-
-        <div class="table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>Item Code</th>
-                <th>Item Name</th>
-                <th>Group</th>
-                <th>Qty</th>
-                <th>QR</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="itemsTableBody">
-              <tr>
-                <td class="empty" colspan="6">Loading items...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="pager">
-          <button class="btn btn-secondary" id="itemsPrevBtn" type="button">Previous</button>
-          <span id="itemsPaginationText">Page 1</span>
-          <button class="btn btn-secondary" id="itemsNextBtn" type="button">Next</button>
-        </div>
+        </aside>
       </section>
     </main>
   </body>

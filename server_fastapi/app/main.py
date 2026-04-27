@@ -13,6 +13,7 @@ from .pagination import build_pagination_meta, normalize_pagination
 from .schemas import (
     ErrorResponse,
     HealthResponse,
+    ItemDetailResponse,
     ItemFilters,
     ItemListResponse,
     OrderCreateRequest,
@@ -21,11 +22,21 @@ from .schemas import (
     OrderFilters,
     OrderItemFilters,
     OrderListResponse,
+    PriceCategoryListResponse,
     RootResponse,
 )
 from .runtime import static_dir
 from .db import assert_database_reachable_for_startup
-from .service import create_order, ensure_order_schema, get_order_detail, list_items, list_orders
+from .service import (
+    create_order,
+    ensure_order_schema,
+    get_item_detail,
+    get_item_image_path,
+    get_order_detail,
+    list_items,
+    list_orders,
+    list_price_categories,
+)
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -125,6 +136,9 @@ def api_meta() -> RootResponse:
         endpoints=[
             "GET /health",
             "GET /api/items",
+            "GET /api/items/detail/{item_lookup}",
+            "GET /api/items/detail/{item_lookup}/image",
+            "GET /api/price-categories",
             "POST /api/orders",
             "GET /api/orders",
             "GET /api/orders/{order_id}",
@@ -169,6 +183,50 @@ def items(
             qrCodeAvailable=result["qrCodeAvailable"],
         ),
     )
+
+
+@app.get(
+    "/api/items/detail/{item_lookup}/image",
+    responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    tags=["Items"],
+    summary="Get item image",
+)
+def item_image(item_lookup: str) -> FileResponse:
+    detail, image_path = get_item_image_path(item_lookup.strip())
+    if not detail:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    if not image_path or not detail["image"]["available"]:
+        raise HTTPException(status_code=404, detail="Image not found for this item.")
+    return FileResponse(
+        image_path,
+        media_type=detail["image"]["contentType"],
+        filename=detail["image"]["fileName"],
+    )
+
+
+@app.get(
+    "/api/items/detail/{item_lookup}",
+    response_model=ItemDetailResponse,
+    responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    tags=["Items"],
+    summary="Get complete item details",
+)
+def item_detail(item_lookup: str) -> ItemDetailResponse:
+    detail = get_item_detail(item_lookup.strip())
+    if not detail:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    return ItemDetailResponse(data=detail)
+
+
+@app.get(
+    "/api/price-categories",
+    response_model=PriceCategoryListResponse,
+    responses={500: {"model": ErrorResponse}},
+    tags=["Items"],
+    summary="List BUSY price categories",
+)
+def price_categories() -> PriceCategoryListResponse:
+    return PriceCategoryListResponse(data=list_price_categories())
 
 
 @app.post(

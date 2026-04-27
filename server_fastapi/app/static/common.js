@@ -184,6 +184,199 @@
     return `line-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
+  function renderItemDetail(detail) {
+    const imageBlock =
+      detail.image && detail.image.available && detail.image.url
+        ? `
+          <div class="item-detail-image-shell">
+            <img
+              class="item-detail-image"
+              src="${escapeAttribute(detail.image.url)}"
+              alt="${escapeAttribute(detail.itemName)}"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
+            />
+            <div class="item-detail-image item-detail-image--empty" style="display:none;">No image</div>
+          </div>
+        `
+        : `
+          <div class="item-detail-image-shell">
+            <div class="item-detail-image item-detail-image--empty">No image</div>
+          </div>
+        `;
+
+    const supportCodes = (detail.supportItemCodes || []).length
+      ? detail.supportItemCodes.map((code) => `<span class="tag">${escapeHtml(code)}</span>`).join("")
+      : `<span class="muted-copy">No extra item codes</span>`;
+
+    const priceRows = (detail.prices || []).length
+      ? detail.prices
+          .map(
+            (price) => `
+              <tr>
+                <td>${escapeHtml(price.categoryName)}</td>
+                <td>${escapeHtml(price.categoryCode)}</td>
+                <td>${formatNumber(price.basePrice)}</td>
+                <td>${formatNumber(price.discountPercent)}%</td>
+                <td>${formatNumber(price.finalPrice)}</td>
+                <td>${formatDate(price.effectiveDate)}</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : `<tr><td class="empty" colspan="6">No price rows found for this item.</td></tr>`;
+
+    const referencePricing = detail.referencePricing
+      ? `
+        <div class="detail-metric">
+          <span>Ref D3</span>
+          <strong>${detail.referencePricing.valueD3 == null ? "-" : formatNumber(detail.referencePricing.valueD3)}</strong>
+        </div>
+        <div class="detail-metric">
+          <span>Ref D5</span>
+          <strong>${detail.referencePricing.valueD5 == null ? "-" : formatNumber(detail.referencePricing.valueD5)}</strong>
+        </div>
+        <div class="detail-metric">
+          <span>Ref Date</span>
+          <strong>${formatDate(detail.referencePricing.effectiveDate)}</strong>
+        </div>
+      `
+      : `
+        <div class="detail-metric">
+          <span>Reference Row</span>
+          <strong>-</strong>
+        </div>
+      `;
+
+    return `
+      <article class="item-detail-card">
+        <div class="item-detail-hero">
+          ${imageBlock}
+          <div class="item-detail-copy">
+            <p class="eyebrow">Complete Item Detail</p>
+            <h2>${escapeHtml(detail.itemName)}</h2>
+            <p class="item-detail-subcopy">${escapeHtml(detail.itemGroup || "Ungrouped item")} • HSN ${escapeHtml(
+              detail.hsnCode || "-",
+            )}</p>
+            <div class="tag-row">
+              <span class="tag">Code ${escapeHtml(detail.itemCode || "-")}</span>
+              <span class="tag">QR ${escapeHtml(detail.qrCode || "-")}</span>
+              <span class="tag">Master ${escapeHtml(String(detail.itemMasterCode))}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-metric-grid">
+          <div class="detail-metric">
+            <span>Stock Qty</span>
+            <strong>${formatNumber(detail.itemQuantity)}</strong>
+          </div>
+          <div class="detail-metric">
+            <span>Stock Value</span>
+            <strong>${formatNumber(detail.itemQuantityValue)}</strong>
+          </div>
+          <div class="detail-metric">
+            <span>Price Rows</span>
+            <strong>${formatNumber(detail.priceCount || 0)}</strong>
+          </div>
+          <div class="detail-metric">
+            <span>Min Final Price</span>
+            <strong>${detail.minFinalPrice == null ? "-" : formatNumber(detail.minFinalPrice)}</strong>
+          </div>
+          <div class="detail-metric">
+            <span>Max Final Price</span>
+            <strong>${detail.maxFinalPrice == null ? "-" : formatNumber(detail.maxFinalPrice)}</strong>
+          </div>
+          ${referencePricing}
+        </div>
+
+        <div class="detail-section">
+          <div class="panel-subhead">
+            <p class="eyebrow">Support Codes</p>
+          </div>
+          <div class="tag-row">${supportCodes}</div>
+        </div>
+
+        <div class="detail-section">
+          <div class="panel-subhead">
+            <p class="eyebrow">BUSY Price Rows</p>
+          </div>
+          <div class="table-shell compact-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Code</th>
+                  <th>Base Price</th>
+                  <th>Discount</th>
+                  <th>Final Price</th>
+                  <th>Effective Date</th>
+                </tr>
+              </thead>
+              <tbody>${priceRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderPriceCategories(categories, emptyMessage = "No price categories found.") {
+    if (!Array.isArray(categories) || !categories.length) {
+      return `<p class="muted-copy">${escapeHtml(emptyMessage)}</p>`;
+    }
+
+    const rows = categories
+      .map(
+        (category) => `
+          <tr>
+            <td>${escapeHtml(category.categoryName || `${category.categoryCode} Price`)}</td>
+            <td>${escapeHtml(category.categoryCode || "-")}</td>
+            <td>${escapeHtml(String(category.slotId ?? "-"))}</td>
+            <td>${formatNumber(category.itemCount || 0)}</td>
+            <td>${formatNumber(category.accountCount || 0)}</td>
+            <td>${formatNumber(category.discountedItemCount || 0)}</td>
+            <td>${formatPriceRange(category.minFinalPrice, category.maxFinalPrice)}</td>
+          </tr>
+        `,
+      )
+      .join("");
+
+    return `
+      <div class="table-shell compact-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Code</th>
+              <th>Slot</th>
+              <th>Items</th>
+              <th>Accounts</th>
+              <th>Discounted</th>
+              <th>Final Price Range</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function formatPriceRange(minFinalPrice, maxFinalPrice) {
+    if (minFinalPrice == null && maxFinalPrice == null) {
+      return "-";
+    }
+    if (minFinalPrice == null) {
+      return formatNumber(maxFinalPrice);
+    }
+    if (maxFinalPrice == null) {
+      return formatNumber(minFinalPrice);
+    }
+    if (Number(minFinalPrice) === Number(maxFinalPrice)) {
+      return formatNumber(minFinalPrice);
+    }
+    return `${formatNumber(minFinalPrice)} - ${formatNumber(maxFinalPrice)}`;
+  }
+
   window.SKBags = {
     apiRequest,
     buildQuery,
@@ -192,12 +385,15 @@
     formatDate,
     formatDateTime,
     formatNumber,
+    formatPriceRange,
     initializeShell,
     getDraft,
     setDraft,
     clearDraft,
     addDraftItem,
     normalizeDraftLine,
+    renderPriceCategories,
+    renderItemDetail,
     setMessage,
     randomId,
   };

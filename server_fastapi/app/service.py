@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+import mimetypes
+from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
+from .config import settings
 from .db import db_connection, rows_to_dicts
 
 
@@ -14,6 +18,18 @@ WITH FolioAgg AS (
         SUM(CAST(ISNULL(D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
         SUM(CAST(ISNULL(D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
     FROM dbo.Folio1
+    GROUP BY MasterCode
+),
+PriceAgg AS (
+    SELECT
+        MasterCode,
+        COUNT(CASE WHEN I1 BETWEEN 101 AND 126 AND ISNULL(D1, 0) > 0 THEN 1 END) AS priceCount,
+        MIN(CASE WHEN I1 BETWEEN 101 AND 126 AND ISNULL(D1, 0) > 0
+            THEN CAST(D1 - ((D1 * ISNULL(D2, 0)) / 100.0) AS DECIMAL(18, 2)) END) AS minFinalPrice,
+        MAX(CASE WHEN I1 BETWEEN 101 AND 126 AND ISNULL(D1, 0) > 0
+            THEN CAST(D1 - ((D1 * ISNULL(D2, 0)) / 100.0) AS DECIMAL(18, 2)) END) AS maxFinalPrice
+    FROM dbo.MasterSupport
+    WHERE MasterType = 6
     GROUP BY MasterCode
 ),
 MasterSupportAgg AS (
@@ -37,7 +53,10 @@ ItemBase AS (
         COALESCE(fa.itemQuantityValue, 0) AS itemQuantityValue,
         COALESCE(m.HSNCode, '') AS hsnCode,
         msa.sellingRateHint AS sellingRateHint,
-        msa.costRateHint AS costRateHint
+        msa.costRateHint AS costRateHint,
+        COALESCE(pa.priceCount, 0) AS priceCount,
+        pa.minFinalPrice AS minFinalPrice,
+        pa.maxFinalPrice AS maxFinalPrice
     FROM dbo.Master1 m
     LEFT JOIN dbo.Master1 pg
         ON pg.Code = m.ParentGrp
@@ -45,9 +64,38 @@ ItemBase AS (
         ON fa.MasterCode = m.Code
     LEFT JOIN MasterSupportAgg msa
         ON msa.MasterCode = m.Code
+    LEFT JOIN PriceAgg pa
+        ON pa.MasterCode = m.Code
     WHERE m.MasterType = 6
 )
 """
+
+
+PRICE_SLOT_MIN = 101
+PRICE_SLOT_MAX = 126
+REFERENCE_SLOT_ID = 301
+PREFERRED_IMAGE_EXTENSIONS = {
+    ".png",
+    ".apng",
+    ".jpg",
+    ".jpeg",
+    ".jpe",
+    ".jfif",
+    ".pjpeg",
+    ".pjp",
+    ".gif",
+    ".bmp",
+    ".dib",
+    ".webp",
+    ".avif",
+    ".svg",
+    ".svgz",
+    ".ico",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".heif",
+}
 
 
 ENSURE_ORDER_SCHEMA_SQL = """
@@ -145,6 +193,203 @@ def _serialize_row(row: dict[str, Any]) -> dict[str, Any]:
     return {key: _serialize(value) for key, value in row.items()}
 
 
+def _clean_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _slot_to_category(slot_id: int) -> tuple[int, str]:
+    category_no = max(slot_id - 100, 0)
+    if 1 <= category_no <= 26:
+        return category_no, chr(64 + category_no)
+    return category_no, str(category_no)
+
+
+def _compute_final_price(base_price: float, discount_percent: float) -> float:
+    return round(base_price - ((base_price * discount_percent) / 100.0), 2)
+
+
+def _image_candidates(item_code: str, support_codes: list[str]) -> list[str]:
+    seen: set[str] = set()
+    candidates: list[str] = []
+    for raw in [item_code, *support_codes]:
+        normalized = _clean_text(raw)
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(normalized)
+    return candidates
+
+
+def _resolve_image_content_type(file_path: Path) -> str:
+    mimetypes.add_type("image/heic", ".heic")
+    mimetypes.add_type("image/heif", ".heif")
+    mimetypes.add_type("image/avif", ".avif")
+    mimetypes.add_type("image/svg+xml", ".svg")
+    mimetypes.add_type("image/svg+xml", ".svgz")
+    mimetypes.add_type("image/x-icon", ".ico")
+    content_type, _ = mimetypes.guess_type(file_path.name)
+    if content_type:
+        return content_type
+    if file_path.suffix:
+        return "application/octet-stream"
+    return "application/octet-stream"
+
+
+def _resolve_item_image(item_code: str, support_codes: list[str]) -> tuple[dict[str, Any], Path | None]:
+    photo_dir = Path(settings.photo_dir)
+    if not photo_dir.exists() or not photo_dir.is_dir():
+        return (
+            {
+                "available": False,
+                "fileName": None,
+                "fileExtension": None,
+                "contentType": None,
+                "url": None,
+            },
+            None,
+        )
+
+    candidates = _image_candidates(item_code, support_codes)
+    candidate_keys = {candidate.lower() for candidate in candidates}
+    matched_files: list[tuple[int, Path, str]] = []
+
+    for file_path in photo_dir.iterdir():
+        if not file_path.is_file():
+            continue
+        if file_path.stem.lower() not in candidate_keys:
+            continue
+        content_type = _resolve_image_content_type(file_path)
+        suffix = file_path.suffix.lower()
+        priority = 0
+        if content_type.startswith("image/"):
+            priority += 10
+        if suffix in PREFERRED_IMAGE_EXTENSIONS:
+            priority += 5
+        matched_files.append((priority, file_path, content_type))
+
+    if matched_files:
+        matched_files.sort(key=lambda item: (-item[0], item[1].suffix.lower(), item[1].name.lower()))
+        _priority, file_path, content_type = matched_files[0]
+        item_lookup = quote(item_code, safe="")
+        return (
+            {
+                "available": True,
+                "fileName": file_path.name,
+                "fileExtension": file_path.suffix,
+                "contentType": content_type,
+                "url": f"/api/items/detail/{item_lookup}/image",
+            },
+            file_path,
+        )
+
+    return (
+        {
+            "available": False,
+            "fileName": None,
+            "fileExtension": None,
+            "contentType": None,
+            "url": None,
+        },
+        None,
+    )
+
+
+def _load_price_category_names(cursor: Any) -> dict[int, str]:
+    cursor.execute(
+        """
+        SELECT
+            I3 AS categoryNo,
+            MAX(CASE WHEN Name LIKE '%Price%' THEN Name END) AS namedCategory
+        FROM dbo.Master1
+        WHERE MasterType = 2
+          AND I3 BETWEEN 1 AND 26
+        GROUP BY I3;
+        """
+    )
+    category_names: dict[int, str] = {}
+    for row in rows_to_dicts(cursor):
+        category_no = int(row["categoryNo"])
+        _, category_code = _slot_to_category(100 + category_no)
+        category_names[category_no] = _clean_text(row.get("namedCategory")) or f"{category_code} Price"
+    return category_names
+
+
+def list_price_categories() -> list[dict[str, Any]]:
+    with db_connection(autocommit=True) as connection:
+        cursor = connection.cursor()
+        category_names = _load_price_category_names(cursor)
+        cursor.execute(
+            """
+            WITH ItemCategoryAgg AS (
+                SELECT
+                    I1 - 100 AS categoryNo,
+                    COUNT(DISTINCT MasterCode) AS itemCount,
+                    COUNT(DISTINCT CASE WHEN ISNULL(D2, 0) > 0 THEN MasterCode END) AS discountedItemCount,
+                    MIN(CASE WHEN ISNULL(D1, 0) > 0
+                        THEN CAST(D1 - ((D1 * ISNULL(D2, 0)) / 100.0) AS DECIMAL(18, 2)) END) AS minFinalPrice,
+                    MAX(CASE WHEN ISNULL(D1, 0) > 0
+                        THEN CAST(D1 - ((D1 * ISNULL(D2, 0)) / 100.0) AS DECIMAL(18, 2)) END) AS maxFinalPrice
+                FROM dbo.MasterSupport
+                WHERE MasterType = 6
+                  AND I1 BETWEEN 101 AND 126
+                GROUP BY I1
+            ),
+            PartyCategoryAgg AS (
+                SELECT
+                    I3 AS categoryNo,
+                    COUNT(*) AS accountCount
+                FROM dbo.Master1
+                WHERE MasterType = 2
+                  AND I3 BETWEEN 1 AND 26
+                GROUP BY I3
+            ),
+            CategoryList AS (
+                SELECT categoryNo FROM ItemCategoryAgg
+                UNION
+                SELECT categoryNo FROM PartyCategoryAgg
+            )
+            SELECT
+                cl.categoryNo,
+                ISNULL(ica.itemCount, 0) AS itemCount,
+                ISNULL(pca.accountCount, 0) AS accountCount,
+                ISNULL(ica.discountedItemCount, 0) AS discountedItemCount,
+                ica.minFinalPrice,
+                ica.maxFinalPrice
+            FROM CategoryList cl
+            LEFT JOIN ItemCategoryAgg ica
+                ON ica.categoryNo = cl.categoryNo
+            LEFT JOIN PartyCategoryAgg pca
+                ON pca.categoryNo = cl.categoryNo
+            WHERE cl.categoryNo BETWEEN 1 AND 26
+            ORDER BY cl.categoryNo ASC;
+            """
+        )
+        rows = rows_to_dicts(cursor)
+
+    categories: list[dict[str, Any]] = []
+    for row in rows:
+        category_no = int(row["categoryNo"])
+        slot_id = 100 + category_no
+        _, category_code = _slot_to_category(slot_id)
+        categories.append(
+            {
+                "categoryNo": category_no,
+                "categoryCode": category_code,
+                "slotId": slot_id,
+                "categoryName": category_names.get(category_no, f"{category_code} Price"),
+                "itemCount": int(row.get("itemCount") or 0),
+                "accountCount": int(row.get("accountCount") or 0),
+                "discountedItemCount": int(row.get("discountedItemCount") or 0),
+                "minFinalPrice": _serialize(row.get("minFinalPrice")),
+                "maxFinalPrice": _serialize(row.get("maxFinalPrice")),
+            }
+        )
+    return categories
+
+
 def ensure_order_schema() -> None:
     with db_connection() as connection:
         cursor = connection.cursor()
@@ -153,11 +398,10 @@ def ensure_order_schema() -> None:
 
 
 def list_items(*, item_code: str, item_name: str, qr_code: str, offset: int, page_size: int) -> dict[str, Any]:
-    if (qr_code or "").strip():
-        return {"items": [], "totalCount": 0, "qrCodeAvailable": False}
+    code_filter = _clean_text(qr_code) or _clean_text(item_code)
 
     params = {
-        "item_code_pattern": _like_pattern(item_code),
+        "item_code_pattern": _like_pattern(code_filter),
         "item_name_pattern": _like_pattern(item_name),
         "offset": offset,
         "page_size": page_size,
@@ -176,14 +420,17 @@ def list_items(*, item_code: str, item_name: str, qr_code: str, offset: int, pag
     SELECT
         itemMasterCode,
         itemCode,
-        qrCode,
+        itemCode AS qrCode,
         itemName,
         itemGroup,
         itemQuantity,
         itemQuantityValue,
         hsnCode,
         sellingRateHint,
-        costRateHint
+        costRateHint,
+        priceCount,
+        minFinalPrice,
+        maxFinalPrice
     FROM ItemBase
     WHERE itemCode LIKE %(item_code_pattern)s
       AND itemName LIKE %(item_name_pattern)s
@@ -198,7 +445,7 @@ def list_items(*, item_code: str, item_name: str, qr_code: str, offset: int, pag
         cursor.execute(data_sql, params)
         items = [_serialize_row(row) for row in rows_to_dicts(cursor)]
 
-    return {"items": items, "totalCount": total_count, "qrCodeAvailable": False}
+    return {"items": items, "totalCount": total_count, "qrCodeAvailable": True}
 
 
 def find_item_reference(
@@ -227,7 +474,7 @@ def find_item_reference(
         SELECT TOP 1
             m.Code AS itemMasterCode,
             CAST(COALESCE(NULLIF(m.Alias, ''), msa.supportItemCode, CAST(m.Code AS NVARCHAR(50))) AS NVARCHAR(50)) AS itemCode,
-            CAST(NULL AS NVARCHAR(100)) AS qrCode,
+            CAST(COALESCE(NULLIF(m.Alias, ''), msa.supportItemCode, CAST(m.Code AS NVARCHAR(50))) AS NVARCHAR(100)) AS qrCode,
             m.Name AS itemName
         FROM dbo.Master1 m
         LEFT JOIN MasterSupportAgg msa
@@ -238,9 +485,7 @@ def find_item_reference(
             OR (
                 %(item_code)s <> ''
                 AND (
-                    m.Alias = %(item_code)s
-                    OR msa.supportItemCode = %(item_code)s
-                    OR CAST(m.Code AS NVARCHAR(50)) = %(item_code)s
+                    CAST(COALESCE(NULLIF(m.Alias, ''), msa.supportItemCode, CAST(m.Code AS NVARCHAR(50))) AS NVARCHAR(50)) = %(item_code)s
                 )
             )
             OR (%(item_name)s <> '' AND m.Name = %(item_name)s)
@@ -263,6 +508,142 @@ def find_item_reference(
     finally:
         if owns_connection and connection is not None:
             connection.close()
+
+
+def _build_item_detail(cursor: Any, item_lookup: str) -> tuple[dict[str, Any] | None, Path | None]:
+    reference = find_item_reference(
+        item_master_code=None,
+        item_code=item_lookup,
+        item_name=None,
+        cursor=cursor,
+    )
+    if not reference:
+        return None, None
+
+    cursor.execute(
+        f"""
+        {ITEM_BASE_CTE}
+        SELECT TOP 1
+            itemMasterCode,
+            itemCode,
+            itemCode AS qrCode,
+            itemName,
+            itemGroup,
+            itemQuantity,
+            itemQuantityValue,
+            hsnCode,
+            sellingRateHint,
+            costRateHint,
+            priceCount,
+            minFinalPrice,
+            maxFinalPrice
+        FROM ItemBase
+        WHERE itemMasterCode = %(item_master_code)s;
+        """,
+        {"item_master_code": reference["itemMasterCode"]},
+    )
+    header_rows = rows_to_dicts(cursor)
+    if not header_rows:
+        return None, None
+
+    header = _serialize_row(header_rows[0])
+
+    cursor.execute(
+        """
+        SELECT
+            MasterCode,
+            C1,
+            I1,
+            I2,
+            D1,
+            D2,
+            D3,
+            D5,
+            [Date],
+            SrNo
+        FROM dbo.MasterSupport
+        WHERE MasterType = 6
+          AND MasterCode = %(item_master_code)s
+        ORDER BY [Date] DESC, SrNo DESC, I1 ASC;
+        """,
+        {"item_master_code": reference["itemMasterCode"]},
+    )
+    support_rows = [_serialize_row(row) for row in rows_to_dicts(cursor)]
+
+    support_item_codes: list[str] = []
+    support_code_seen: set[str] = set()
+    latest_price_rows: dict[int, dict[str, Any]] = {}
+    latest_reference_row: dict[str, Any] | None = None
+
+    for row in support_rows:
+        support_code = _clean_text(row.get("C1"))
+        if support_code and support_code.lower() not in support_code_seen:
+            support_code_seen.add(support_code.lower())
+            support_item_codes.append(support_code)
+
+        slot_id = int(row.get("I1") or 0)
+        if PRICE_SLOT_MIN <= slot_id <= PRICE_SLOT_MAX:
+            latest_price_rows.setdefault(slot_id, row)
+        elif slot_id == REFERENCE_SLOT_ID and latest_reference_row is None:
+            latest_reference_row = row
+
+    category_names = _load_price_category_names(cursor)
+    prices: list[dict[str, Any]] = []
+    for slot_id in sorted(latest_price_rows):
+        row = latest_price_rows[slot_id]
+        base_price = float(row.get("D1") or 0)
+        discount_percent = float(row.get("D2") or 0)
+        if base_price <= 0 and discount_percent <= 0:
+            continue
+        category_no, category_code = _slot_to_category(slot_id)
+        prices.append(
+            {
+                "slotId": slot_id,
+                "categoryNo": category_no,
+                "categoryCode": category_code,
+                "categoryName": category_names.get(category_no, f"{category_code} Price"),
+                "basePrice": base_price,
+                "discountPercent": discount_percent,
+                "finalPrice": _compute_final_price(base_price, discount_percent),
+                "effectiveDate": row.get("Date"),
+            }
+        )
+
+    image, image_path = _resolve_item_image(str(header.get("itemCode") or ""), support_item_codes)
+
+    reference_pricing = None
+    if latest_reference_row and (
+        float(latest_reference_row.get("D3") or 0) > 0 or float(latest_reference_row.get("D5") or 0) > 0
+    ):
+        reference_pricing = {
+            "slotId": REFERENCE_SLOT_ID,
+            "effectiveDate": latest_reference_row.get("Date"),
+            "valueD3": float(latest_reference_row.get("D3") or 0) or None,
+            "valueD5": float(latest_reference_row.get("D5") or 0) or None,
+        }
+
+    detail = {
+        **header,
+        "qrCode": header.get("itemCode"),
+        "supportItemCodes": support_item_codes,
+        "image": image,
+        "prices": prices,
+        "referencePricing": reference_pricing,
+    }
+    return detail, image_path
+
+
+def get_item_detail(item_lookup: str) -> dict[str, Any] | None:
+    with db_connection(autocommit=True) as connection:
+        cursor = connection.cursor()
+        detail, _image_path = _build_item_detail(cursor, item_lookup)
+        return detail
+
+
+def get_item_image_path(item_lookup: str) -> tuple[dict[str, Any] | None, Path | None]:
+    with db_connection(autocommit=True) as connection:
+        cursor = connection.cursor()
+        return _build_item_detail(cursor, item_lookup)
 
 
 def _normalize_order_date(value: date | None) -> date:

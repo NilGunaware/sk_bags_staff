@@ -6,7 +6,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetBtn: document.getElementById("itemsResetBtn"),
     tableBody: document.getElementById("itemsTableBody"),
     meta: document.getElementById("itemsMeta"),
+    priceCategoriesMeta: document.getElementById("itemsPriceCategoriesMeta"),
+    priceCategoriesPanel: document.getElementById("itemsPriceCategoriesPanel"),
     qrStatusChip: document.getElementById("qrStatusChip"),
+    detailMeta: document.getElementById("itemDetailMeta"),
+    detailPanel: document.getElementById("itemDetailPanel"),
     draftSummaryChip: document.getElementById("draftSummaryChip"),
     paginationText: document.getElementById("itemsPaginationText"),
     prevBtn: document.getElementById("itemsPrevBtn"),
@@ -20,6 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const state = {
     page: 1,
     pageSize: 10,
+    selectedLookup: "",
     filters: {
       itemCode: "",
       itemName: "",
@@ -38,6 +43,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   refs.resetBtn.addEventListener("click", async () => {
     state.page = 1;
     state.pageSize = 10;
+    state.selectedLookup = "";
     state.filters = {
       itemCode: "",
       itemName: "",
@@ -45,6 +51,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
     refs.form.reset();
     refs.pageSize.value = "10";
+    refs.detailMeta.textContent = "Waiting...";
+    refs.detailPanel.innerHTML = `<p class="muted-copy">Select an item row to load complete BUSY detail.</p>`;
     await loadItems();
   });
 
@@ -62,7 +70,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  await loadPriceCategories();
   await loadItems();
+
+  async function loadPriceCategories() {
+    refs.priceCategoriesMeta.textContent = "Loading...";
+    refs.priceCategoriesPanel.innerHTML = `<p class="muted-copy">Loading price categories...</p>`;
+
+    try {
+      const response = await SKBags.apiRequest("/api/price-categories");
+      refs.priceCategoriesMeta.textContent = `${response.data.length} category(s)`;
+      refs.priceCategoriesPanel.innerHTML = SKBags.renderPriceCategories(
+        response.data,
+        "No active price categories found.",
+      );
+    } catch (_error) {
+      refs.priceCategoriesMeta.textContent = "Unavailable";
+      refs.priceCategoriesPanel.innerHTML =
+        `<p class="message-slot is-error">Price category list is unavailable right now.</p>`;
+    }
+  }
 
   function syncFilters() {
     state.pageSize = Number(refs.pageSize.value || 10);
@@ -78,7 +105,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function loadItems() {
-    refs.tableBody.innerHTML = `<tr><td class="empty" colspan="6">Loading items...</td></tr>`;
+    refs.tableBody.innerHTML = `<tr><td class="empty" colspan="7">Loading items...</td></tr>`;
     refs.meta.textContent = "Loading...";
     refs.qrStatusChip.textContent = "Waiting...";
     syncDraftSummary();
@@ -93,33 +120,41 @@ document.addEventListener("DOMContentLoaded", async () => {
       state.pagination = response.pagination;
 
       refs.meta.textContent = `${response.pagination.totalCount} item(s)`;
-      refs.qrStatusChip.textContent = response.filters.qrCodeAvailable ? "QR available" : "QR not available in DB";
+      refs.qrStatusChip.textContent = response.filters.qrCodeAvailable
+        ? "QR lookup enabled"
+        : "QR not available in DB";
       refs.paginationText.textContent = buildPagerText(response.pagination);
       refs.prevBtn.disabled = response.pagination.page <= 1;
       refs.nextBtn.disabled = response.pagination.page >= response.pagination.totalPages;
 
       if (!response.data.length) {
-        refs.tableBody.innerHTML = `<tr><td class="empty" colspan="6">No items matched the current filters.</td></tr>`;
+        refs.tableBody.innerHTML = `<tr><td class="empty" colspan="7">No items matched the current filters.</td></tr>`;
         return;
       }
 
       refs.tableBody.innerHTML = response.data
         .map(
           (item) => `
-            <tr>
+            <tr data-item-lookup="${SKBags.escapeAttribute(item.itemCode || item.qrCode || "")}">
               <td>${SKBags.escapeHtml(item.itemCode || "-")}</td>
               <td>${SKBags.escapeHtml(item.itemName)}</td>
               <td>${SKBags.escapeHtml(item.itemGroup || "-")}</td>
               <td>${SKBags.formatNumber(item.itemQuantity)}</td>
-              <td>${SKBags.escapeHtml(item.qrCode || "Not available")}</td>
+              <td>${SKBags.formatNumber(item.priceCount || 0)}</td>
+              <td>${SKBags.formatPriceRange(item.minFinalPrice, item.maxFinalPrice)}</td>
               <td>
-                <button class="btn btn-secondary" type="button" data-add='${SKBags.escapeAttribute(
-                  JSON.stringify({
-                    itemCode: item.itemCode || "",
-                    itemName: item.itemName || "",
-                    quantity: 1,
-                  }),
-                )}'>Add To Draft</button>
+                <div class="action-row">
+                  <button class="btn btn-secondary" type="button" data-open="${SKBags.escapeAttribute(
+                    item.itemCode || item.qrCode || "",
+                  )}">Open Detail</button>
+                  <button class="btn btn-secondary" type="button" data-add='${SKBags.escapeAttribute(
+                    JSON.stringify({
+                      itemCode: item.itemCode || "",
+                      itemName: item.itemName || "",
+                      quantity: 1,
+                    }),
+                  )}'>Add To Draft</button>
+                </div>
               </td>
             </tr>
           `,
@@ -134,13 +169,43 @@ document.addEventListener("DOMContentLoaded", async () => {
           refs.meta.textContent = `${response.pagination.totalCount} item(s) • Added ${payload.itemCode || payload.itemName}`;
         });
       });
+
+      refs.tableBody.querySelectorAll("[data-open]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const lookup = button.dataset.open;
+          if (!lookup) {
+            return;
+          }
+          state.selectedLookup = lookup;
+          await loadItemDetail(lookup);
+        });
+      });
+
+      if (!state.selectedLookup && response.data[0]?.itemCode) {
+        state.selectedLookup = response.data[0].itemCode;
+        await loadItemDetail(state.selectedLookup);
+      }
     } catch (error) {
       refs.meta.textContent = "Items unavailable";
       refs.qrStatusChip.textContent = "Request failed";
       refs.paginationText.textContent = "No results";
       refs.prevBtn.disabled = true;
       refs.nextBtn.disabled = true;
-      refs.tableBody.innerHTML = `<tr><td class="empty" colspan="6">${SKBags.escapeHtml(error.message)}</td></tr>`;
+      refs.tableBody.innerHTML = `<tr><td class="empty" colspan="7">${SKBags.escapeHtml(error.message)}</td></tr>`;
+    }
+  }
+
+  async function loadItemDetail(lookup) {
+    refs.detailMeta.textContent = `Loading ${lookup}`;
+    refs.detailPanel.innerHTML = `<p class="muted-copy">Loading complete item detail...</p>`;
+
+    try {
+      const response = await SKBags.apiRequest(`/api/items/detail/${encodeURIComponent(lookup)}`);
+      refs.detailMeta.textContent = `Loaded ${response.data.itemCode || lookup}`;
+      refs.detailPanel.innerHTML = SKBags.renderItemDetail(response.data);
+    } catch (error) {
+      refs.detailMeta.textContent = "Detail unavailable";
+      refs.detailPanel.innerHTML = `<p class="message-slot is-error">${SKBags.escapeHtml(error.message)}</p>`;
     }
   }
 

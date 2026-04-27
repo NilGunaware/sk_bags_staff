@@ -93,8 +93,68 @@
         <a class="route-card" href="/items">
           <p class="eyebrow">Items</p>
           <h2>Item browser page</h2>
-          <p>Search item code, item name, and see quantity from the recent BUSY database with pagination.</p>
+          <p>Search item code, item name, inspect complete detail, pricing rows, discount, final price, and image.</p>
         </a>
+      </section>
+
+      <section class="panel-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Dashboard Lookup</p>
+              <h2>Find one item instantly</h2>
+            </div>
+            <span class="meta-chip" id="homeLookupMeta">Ready</span>
+          </div>
+
+          <form id="homeLookupForm" class="field-grid">
+            <label>
+              <span>Item Code</span>
+              <input type="text" id="homeLookupCode" placeholder="44206" />
+            </label>
+            <label>
+              <span>QR Code</span>
+              <input type="text" id="homeLookupQr" placeholder="Same as item code" />
+            </label>
+            <label>
+              <span>Item Name Search</span>
+              <input type="text" id="homeLookupName" placeholder="Optional browser shortcut" />
+            </label>
+            <div class="action-row">
+              <button class="btn btn-primary" type="submit">Load Detail</button>
+              <a class="btn btn-secondary" href="/items">Open Full Items Page</a>
+            </div>
+          </form>
+        </section>
+
+        <aside class="panel side-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Selected Item</p>
+              <h2>Complete detail preview</h2>
+            </div>
+          </div>
+          <div id="homeLookupPanel">
+            <p class="muted-copy">Search by item code or QR code to load complete item detail here.</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">BUSY Pricing</p>
+            <h2>Price category list</h2>
+            <p class="panel-copy">
+              These categories are decoded from BUSY pricing slots. The table shows active item usage, party usage,
+              discount coverage, and current final-price range.
+            </p>
+          </div>
+          <span class="meta-chip" id="homePriceCategoriesMeta">Loading...</span>
+        </div>
+        <div id="homePriceCategoriesPanel">
+          <p class="muted-copy">Loading price categories...</p>
+        </div>
       </section>
     </main>
   </body>

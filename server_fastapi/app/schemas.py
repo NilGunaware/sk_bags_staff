@@ -60,12 +60,81 @@ class ItemSummary(BaseModel):
     hsnCode: str | None = None
     sellingRateHint: float | None = None
     costRateHint: float | None = None
+    priceCount: int = 0
+    minFinalPrice: float | None = None
+    maxFinalPrice: float | None = None
 
 
 class ItemListResponse(BaseModel):
     data: list[ItemSummary]
     pagination: PaginationMeta
     filters: ItemFilters
+
+
+class ItemImageInfo(BaseModel):
+    available: bool
+    fileName: str | None = None
+    fileExtension: str | None = None
+    contentType: str | None = None
+    url: str | None = None
+
+
+class ItemPriceRow(BaseModel):
+    slotId: int
+    categoryNo: int
+    categoryCode: str
+    categoryName: str
+    basePrice: float
+    discountPercent: float
+    finalPrice: float
+    effectiveDate: date | None = None
+
+
+class ItemReferencePricing(BaseModel):
+    slotId: int
+    effectiveDate: date | None = None
+    valueD3: float | None = None
+    valueD5: float | None = None
+
+
+class ItemDetail(BaseModel):
+    itemMasterCode: int
+    itemCode: str | None = None
+    qrCode: str | None = None
+    itemName: str
+    itemGroup: str
+    itemQuantity: float
+    itemQuantityValue: float
+    hsnCode: str | None = None
+    sellingRateHint: float | None = None
+    costRateHint: float | None = None
+    priceCount: int = 0
+    minFinalPrice: float | None = None
+    maxFinalPrice: float | None = None
+    supportItemCodes: list[str] = Field(default_factory=list)
+    image: ItemImageInfo
+    prices: list[ItemPriceRow] = Field(default_factory=list)
+    referencePricing: ItemReferencePricing | None = None
+
+
+class ItemDetailResponse(BaseModel):
+    data: ItemDetail
+
+
+class PriceCategorySummary(BaseModel):
+    categoryNo: int
+    categoryCode: str
+    slotId: int
+    categoryName: str
+    itemCount: int = 0
+    accountCount: int = 0
+    discountedItemCount: int = 0
+    minFinalPrice: float | None = None
+    maxFinalPrice: float | None = None
+
+
+class PriceCategoryListResponse(BaseModel):
+    data: list[PriceCategorySummary]
 
 
 class OrderItemInput(BaseModel):

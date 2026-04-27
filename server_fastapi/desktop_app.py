@@ -45,6 +45,14 @@ LICENSE_IS_ACTIVE: bool | None = None
 LICENSE_LAST_RESPONSE = ""
 
 
+def _env_bool(value: str | bool | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return value.strip().lower() in {"1", "true", "yes", "on", "debug"}
+
+
 def _quote_env_value(value: str) -> str:
     if value == "":
         return '""'
@@ -83,6 +91,7 @@ def refresh_license_status() -> tuple[bool, str]:
 
 class LocalEnvStore:
     KEY_ORDER = [
+        "IS_DEBUG",
         "PORT",
         "DB_HOST",
         "DB_PORT",
@@ -115,16 +124,41 @@ class LocalEnvStore:
         return values
 
     def has_saved_connection(self) -> bool:
-        if not env_path().exists():
+        if not env_path().exists() and not self.is_debug_mode():
             return False
-
         values = self.load_values()
-        return all(values.get(key, "").strip() for key in ["DB_HOST", "DB_PORT", "DB_USER", "DB_NAME"])
+        effective = self.effective_connection_values(values)
+        return all(effective.get(key, "").strip() for key in ["DB_HOST", "DB_PORT", "DB_USER", "DB_NAME"])
+
+    def is_debug_mode(self, values: dict[str, str] | None = None) -> bool:
+        source_values = values or self.load_values()
+        return _env_bool(source_values.get("IS_DEBUG"), False)
+
+    def default_connection_values(self) -> dict[str, str]:
+        example_values = self._read_env_file(env_example_path()) if env_example_path().exists() else {}
+        return {
+            "PORT": example_values.get("PORT", "8000") or "8000",
+            "DB_HOST": example_values.get("DB_HOST", settings.db_host) or settings.db_host,
+            "DB_PORT": example_values.get("DB_PORT", str(settings.db_port)) or str(settings.db_port),
+            "DB_USER": example_values.get("DB_USER", settings.db_user) or settings.db_user,
+            "DB_PASSWORD": example_values.get("DB_PASSWORD", settings.db_password),
+            "DB_NAME": example_values.get("DB_NAME", settings.db_name) or settings.db_name,
+        }
+
+    def effective_connection_values(self, values: dict[str, str] | None = None) -> dict[str, str]:
+        source_values = values or self.load_values()
+        if self.is_debug_mode(source_values):
+            return self.default_connection_values()
+
+        defaults = self.default_connection_values()
+        return {key: source_values.get(key, defaults.get(key, "")) for key in self.CONFIG_KEYS}
 
     def save_connection(self, connection_values: dict[str, str]) -> None:
         values = self.load_values()
         values.update({key: value for key, value in connection_values.items() if key in self.CONFIG_KEYS})
 
+        if "IS_DEBUG" not in values:
+            values["IS_DEBUG"] = "false"
         if "PORT" not in values:
             values["PORT"] = "8000"
         if "DB_TIMEOUT" not in values:
@@ -868,14 +902,17 @@ class DesktopApp:
 
     def _load_connection_form(self) -> None:
         values = self.env_store.load_values()
-        self.service_port_var.set(values.get("PORT", str(settings.port or 8000)))
-        self.db_host_var.set(values.get("DB_HOST", settings.db_host))
-        self.db_port_var.set(values.get("DB_PORT", str(settings.db_port)))
-        self.db_user_var.set(values.get("DB_USER", settings.db_user))
-        self.db_password_var.set(values.get("DB_PASSWORD", settings.db_password))
-        self.db_name_var.set(values.get("DB_NAME", settings.db_name))
+        effective_values = self.env_store.effective_connection_values(values)
+        self.service_port_var.set(effective_values.get("PORT", str(settings.port or 8000)))
+        self.db_host_var.set(effective_values.get("DB_HOST", settings.db_host))
+        self.db_port_var.set(effective_values.get("DB_PORT", str(settings.db_port)))
+        self.db_user_var.set(effective_values.get("DB_USER", settings.db_user))
+        self.db_password_var.set(effective_values.get("DB_PASSWORD", settings.db_password))
+        self.db_name_var.set(effective_values.get("DB_NAME", settings.db_name))
         self._apply_runtime_connection_values(self._collect_connection_values())
         self._update_connection_summary()
+        if self.env_store.is_debug_mode(values):
+            self.connection_note_var.set("Debug mode is enabled. Using default credentials from .env.example.")
 
     def _update_connection_summary(self) -> None:
         host = self.db_host_var.get().strip() or "-"
@@ -884,8 +921,9 @@ class DesktopApp:
         self.db_target_var.set(f"{host}:{port}\n{database}")
 
     def _apply_runtime_connection_values(self, values: dict[str, str]) -> None:
+        runtime_values = self.env_store.effective_connection_values({**self.env_store.load_values(), **values})
         for key in self.env_store.CONFIG_KEYS:
-            os.environ[key] = values.get(key, "")
+            os.environ[key] = runtime_values.get(key, "")
         settings.reload()
         self.url_var.set(self.server_manager.base_url)
 
@@ -931,8 +969,12 @@ class DesktopApp:
             return
 
         if self.env_store.has_saved_connection():
-            self.connection_note_var.set("Saved settings found. Starting automatically.")
-            self.server_manager.log("Saved database settings detected. Starting API automatically.")
+            if self.env_store.is_debug_mode():
+                self.connection_note_var.set("Debug mode is enabled. Starting with default credentials.")
+                self.server_manager.log("Debug mode detected. Starting API with default credentials.")
+            else:
+                self.connection_note_var.set("Saved settings found. Starting automatically.")
+                self.server_manager.log("Saved database settings detected. Starting API automatically.")
             self.server_manager.start()
         else:
             self.server_manager.status = "Config Required"
@@ -944,8 +986,12 @@ class DesktopApp:
             self.server_manager.log("Load Saved is blocked because the licence is expired.")
             return
         self._load_connection_form()
-        self.connection_note_var.set("Loaded saved settings from local .env.")
-        self.server_manager.log("Loaded saved database settings into the form.")
+        if self.env_store.is_debug_mode():
+            self.connection_note_var.set("Debug mode is enabled. Loaded default credentials from .env.example.")
+            self.server_manager.log("Debug mode enabled. Loaded default credentials into the form.")
+        else:
+            self.connection_note_var.set("Loaded saved settings from local .env.")
+            self.server_manager.log("Loaded saved database settings into the form.")
 
     def save_form_values_locally(self) -> None:
         if LICENSE_IS_ACTIVE is not True:
@@ -962,13 +1008,18 @@ class DesktopApp:
             return
 
         self.env_store.save_connection(values)
-        self._apply_runtime_connection_values(values)
-        self._update_connection_summary()
-        self.connection_note_var.set("Saved locally. Current form values were stored in .env.")
-        self.server_manager.log(
-            f"Saved service port {settings.port} and database settings for "
-            f"{settings.db_host}:{settings.db_port}/{settings.db_name} locally."
-        )
+        self._load_connection_form()
+        if self.env_store.is_debug_mode():
+            self.connection_note_var.set(
+                "Saved locally. Debug mode is enabled, so the launcher is still using default credentials."
+            )
+            self.server_manager.log("Saved values locally. Debug mode keeps the runtime on default credentials.")
+        else:
+            self.connection_note_var.set("Saved locally. Current form values were stored in .env.")
+            self.server_manager.log(
+                f"Saved service port {settings.port} and database settings for "
+                f"{settings.db_host}:{settings.db_port}/{settings.db_name} locally."
+            )
 
     def start_server_only(self) -> None:
         if not self.env_store.has_saved_connection():
@@ -1000,13 +1051,16 @@ class DesktopApp:
             return
 
         self.env_store.save_connection(values)
-        self._apply_runtime_connection_values(values)
-        self._update_connection_summary()
-        self.connection_note_var.set("Saved locally. Reconnecting service...")
-        self.server_manager.log(
-            f"Saved service port {settings.port} and database settings for "
-            f"{settings.db_host}:{settings.db_port}/{settings.db_name}. Reconnecting API."
-        )
+        self._load_connection_form()
+        if self.env_store.is_debug_mode():
+            self.connection_note_var.set("Debug mode is enabled. Reconnecting with default credentials...")
+            self.server_manager.log("Debug mode enabled. Reconnecting API with default credentials.")
+        else:
+            self.connection_note_var.set("Saved locally. Reconnecting service...")
+            self.server_manager.log(
+                f"Saved service port {settings.port} and database settings for "
+                f"{settings.db_host}:{settings.db_port}/{settings.db_name}. Reconnecting API."
+            )
         self.server_manager.stop()
         time.sleep(0.4)
         if not self.server_manager.start() and LICENSE_IS_ACTIVE is not True:

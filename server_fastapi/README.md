@@ -43,6 +43,9 @@ python3 desktop_app.py
 
 The desktop app will:
 
+- respect `IS_DEBUG` from `.env`
+- when `IS_DEBUG=true`, use the default credentials from `.env.example`
+- when `IS_DEBUG=false`, use the saved or entered values from `.env`
 - let you enter the database host/IP, port, username, password, and database name
 - let you set the API service port, defaulting to `8000`
 - save those values locally in `server_fastapi/.env`
@@ -58,6 +61,22 @@ The desktop app will:
 - stop the API when you close the window
 
 If SQL Server is not reachable, the launcher stays open and the logs will show the startup error so you can fix the server IP, port, database name, or credentials and use `Reconnect`.
+
+### Debug / Release Mode
+
+Add this in `.env`:
+
+```env
+IS_DEBUG=true
+```
+
+Behavior:
+
+- `IS_DEBUG=true`
+  - the launcher uses the default credentials from `.env.example`
+  - saved custom DB settings stay in `.env`, but runtime still uses the debug defaults
+- `IS_DEBUG=false`
+  - the launcher uses the saved or entered values from `.env`
 
 ## Windows EXE Build
 

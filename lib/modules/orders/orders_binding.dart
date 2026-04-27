@@ -10,15 +10,21 @@ import 'order_list_controller.dart';
 class OrdersDependenciesBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<ApiProvider>(() => ApiProvider(), fenix: true);
-    Get.lazyPut<LocalItemSyncService>(
-      () => LocalItemSyncService(),
-      fenix: true,
-    );
-    Get.lazyPut<OrderService>(
-      () => OrderService(Get.find<ApiProvider>()),
-      fenix: true,
-    );
+    if (!Get.isRegistered<ApiProvider>()) {
+      Get.lazyPut<ApiProvider>(() => ApiProvider(), fenix: true);
+    }
+    if (!Get.isRegistered<LocalItemSyncService>()) {
+      Get.lazyPut<LocalItemSyncService>(
+        () => LocalItemSyncService(),
+        fenix: true,
+      );
+    }
+    if (!Get.isRegistered<OrderService>()) {
+      Get.lazyPut<OrderService>(
+        () => OrderService(Get.find<ApiProvider>()),
+        fenix: true,
+      );
+    }
   }
 }
 

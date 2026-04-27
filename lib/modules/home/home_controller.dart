@@ -8,7 +8,11 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/api_endpoints.dart';
+import '../../core/services/local_item_sync_service.dart';
+import '../../core/services/order_cart_service.dart';
+import '../../core/services/order_service.dart';
 import '../../core/utils/api_response_handler.dart';
+import '../../data/models/order_models.dart';
 import '../../data/providers/api_provider.dart';
 import '../../routes/app_routes.dart';
 import '../auth/controllers/auth_controller.dart';
@@ -16,6 +20,10 @@ import '../auth/controllers/auth_controller.dart';
 class HomeController extends GetxController {
   final AuthController authController = Get.find<AuthController>();
   final ApiProvider _apiProvider = Get.find<ApiProvider>();
+  final LocalItemSyncService _itemSyncService =
+      Get.find<LocalItemSyncService>();
+  final OrderService _orderService = Get.find<OrderService>();
+  final OrderCartService cartService = Get.find<OrderCartService>();
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
   Map<String, dynamic>? get user => authController.user.value;
@@ -46,12 +54,188 @@ class HomeController extends GetxController {
   }.obs;
   final isCheckingServerHealth = false.obs;
   final lastServerHealthCheck = Rxn<DateTime>();
+  final isLoadingPriceCategories = false.obs;
+  final priceCategoryError = RxnString();
+  final isLookingUpItem = false.obs;
+  final isPlacingCartOrder = false.obs;
 
   Timer? _serverHealthTimer;
+
+  List<PriceCategoryModel> get priceCategories => cartService.priceCategories;
+  PriceCategoryModel? get selectedPriceCategory =>
+      cartService.selectedPriceCategory.value;
+  int get cartCount => cartService.lineCount;
+  int get cartTotalQuantity => cartService.totalQuantity;
+  double get cartTotalAmount => cartService.totalAmount;
 
   bool canDeleteStockItem(Map<String, dynamic> item) {
     return item['is_delete']?.toString() == '1';
   }
+
+  Future<void> loadPriceCategories({bool refresh = false}) async {
+    if (isLoadingPriceCategories.value && !refresh) {
+      return;
+    }
+
+    isLoadingPriceCategories.value = true;
+    try {
+      priceCategoryError.value = null;
+      final categories = await _itemSyncService.fetchPriceCategories();
+      cartService.setPriceCategories(categories);
+      if (categories.isEmpty) {
+        priceCategoryError.value = 'No pricing categories available.';
+      }
+    } catch (_) {
+      priceCategoryError.value =
+          'Pricing categories are unavailable right now.';
+    } finally {
+      isLoadingPriceCategories.value = false;
+    }
+  }
+
+  void selectPriceCategory(PriceCategoryModel category) {
+    cartService.selectPriceCategory(category);
+  }
+
+  Future<MergedItemDetailModel?> fetchItemDetailByLookup(
+    String lookup, {
+    bool showErrors = true,
+  }) async {
+    final trimmedLookup = lookup.trim();
+    if (trimmedLookup.isEmpty) {
+      if (showErrors) {
+        ApiResponseHandler.showErrorSnackbar('Enter a QR code or item code');
+      }
+      return null;
+    }
+
+    isLookingUpItem.value = true;
+    try {
+      return await _itemSyncService.fetchItemDetailByLookup(trimmedLookup);
+    } catch (error) {
+      if (showErrors) {
+        ApiResponseHandler.showErrorSnackbar(_friendlyLookupMessage(error));
+      }
+      return null;
+    } finally {
+      isLookingUpItem.value = false;
+    }
+  }
+
+  void addToCart(MergedItemDetailModel detail, {int quantity = 1}) {
+    cartService.addFromDetail(detail, quantity: quantity);
+    ApiResponseHandler.showSuccessSnackbar('Added to cart');
+  }
+
+  void updateCartItemQuantity(CartItemModel item, int quantity) {
+    cartService.updateQuantity(item, quantity);
+  }
+
+  void removeCartItem(CartItemModel item) {
+    cartService.removeItem(item);
+  }
+
+  void clearCart() {
+    cartService.clear();
+  }
+
+  Future<bool> placeCartOrder({
+    required String partyName,
+    required String partyMobile,
+  }) async {
+    final trimmedName = partyName.trim();
+    final trimmedMobile = partyMobile.trim();
+    if (trimmedName.isEmpty) {
+      ApiResponseHandler.showErrorSnackbar('Party name is required');
+      return false;
+    }
+    if (trimmedMobile.isEmpty || trimmedMobile.length < 10) {
+      ApiResponseHandler.showErrorSnackbar('Enter a valid mobile no');
+      return false;
+    }
+    if (cartService.items.isEmpty) {
+      ApiResponseHandler.showErrorSnackbar('Cart is empty');
+      return false;
+    }
+
+    isPlacingCartOrder.value = true;
+    try {
+      final nextEntryNo = await _orderService.suggestNextEntryNo();
+      final draftItems = cartService.items
+          .map(
+            (item) => DraftOrderItem(
+              itemCode: item.itemCode,
+              itemName: item.itemName,
+              availableQuantity: item.availableQuantity,
+              quantity: item.quantity,
+            ),
+          )
+          .toList();
+
+      final response = await _orderService.createOrder(
+        uuid: DateTime.now().millisecondsSinceEpoch.toString(),
+        entryNo: nextEntryNo,
+        entryDate: _entryDate,
+        partyName: trimmedName,
+        partyMobile: trimmedMobile,
+        items: draftItems,
+      );
+
+      if (_orderService.isSuccessResponse(response)) {
+        final message = _orderService.extractMessage(response);
+        cartService.clear();
+        ApiResponseHandler.showSuccessSnackbar(
+          message.isEmpty ? 'Order created successfully' : message,
+        );
+        return true;
+      }
+
+      ApiResponseHandler.showErrorSnackbar(
+        _orderService.extractMessage(response).isEmpty
+            ? 'Could not create order'
+            : _orderService.extractMessage(response),
+      );
+      return false;
+    } catch (_) {
+      ApiResponseHandler.showErrorSnackbar('Could not create order');
+      return false;
+    } finally {
+      isPlacingCartOrder.value = false;
+    }
+  }
+
+  String selectedPriceLabelFor(MergedItemDetailModel detail) {
+    final category = selectedPriceCategory;
+    return detail.priceFor(category).categoryName;
+  }
+
+  double selectedPriceForDetail(MergedItemDetailModel detail) {
+    return detail.priceFor(selectedPriceCategory).finalPrice;
+  }
+
+  double selectedPriceForCartItem(CartItemModel item) {
+    return item.priceFor(selectedPriceCategory).finalPrice;
+  }
+
+  String _friendlyLookupMessage(Object error) {
+    final text = error.toString().trim();
+    if (text.isEmpty) {
+      return 'Item lookup is unavailable right now.';
+    }
+    final lower = text.toLowerCase();
+    if (lower.contains('unavailable') || lower.contains('connection')) {
+      return 'Item servers are unavailable right now. Check the dashboard status.';
+    }
+    if (lower.contains('no item matched') || lower.contains('not found')) {
+      return 'No item matched this QR code.';
+    }
+    return text;
+  }
+
+  String get _entryDate =>
+      '${DateTime.now().year}-'
+      '${DateTime.now().month.toString().padLeft(2, '0')}-'
+      '${DateTime.now().day.toString().padLeft(2, '0')}';
 
   Future<void> fetchStockList({bool refresh = false}) async {
     if (refresh) {
@@ -430,6 +614,7 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
     fetchProfile();
+    loadPriceCategories();
     fetchStockList(refresh: true);
     checkItemServersHealth(showLoading: true);
     _serverHealthTimer = Timer.periodic(

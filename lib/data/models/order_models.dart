@@ -156,6 +156,297 @@ class MergedItemModel {
   }
 }
 
+class PriceCategoryModel {
+  const PriceCategoryModel({
+    required this.categoryNo,
+    required this.categoryCode,
+    required this.slotId,
+    required this.categoryName,
+    required this.itemCount,
+    required this.accountCount,
+    required this.discountedItemCount,
+    required this.minFinalPrice,
+    required this.maxFinalPrice,
+  });
+
+  final int categoryNo;
+  final String categoryCode;
+  final int slotId;
+  final String categoryName;
+  final int itemCount;
+  final int accountCount;
+  final int discountedItemCount;
+  final double minFinalPrice;
+  final double maxFinalPrice;
+
+  factory PriceCategoryModel.fromJson(Map<String, dynamic> json) {
+    return PriceCategoryModel(
+      categoryNo: _parseInt(json['categoryNo'] ?? json['category_no']),
+      categoryCode: (json['categoryCode'] ?? json['category_code'] ?? '')
+          .toString(),
+      slotId: _parseInt(json['slotId'] ?? json['slot_id']),
+      categoryName: (json['categoryName'] ?? json['category_name'] ?? '')
+          .toString(),
+      itemCount: _parseInt(json['itemCount'] ?? json['item_count']),
+      accountCount: _parseInt(json['accountCount'] ?? json['account_count']),
+      discountedItemCount: _parseInt(
+        json['discountedItemCount'] ?? json['discounted_item_count'],
+      ),
+      minFinalPrice: _parseDouble(
+        json['minFinalPrice'] ?? json['min_final_price'],
+      ),
+      maxFinalPrice: _parseDouble(
+        json['maxFinalPrice'] ?? json['max_final_price'],
+      ),
+    );
+  }
+}
+
+class ItemImageModel {
+  const ItemImageModel({
+    required this.available,
+    this.url,
+    this.fileName,
+    this.fileExtension,
+    this.contentType,
+  });
+
+  final bool available;
+  final String? url;
+  final String? fileName;
+  final String? fileExtension;
+  final String? contentType;
+
+  factory ItemImageModel.fromJson(
+    Map<String, dynamic> json, {
+    required String baseUrl,
+  }) {
+    final rawUrl = _parseNullableString(json['url']);
+    String? resolvedUrl = rawUrl;
+    if (rawUrl != null && rawUrl.startsWith('/')) {
+      resolvedUrl = '$baseUrl$rawUrl';
+    }
+    return ItemImageModel(
+      available: json['available'] == true,
+      url: resolvedUrl,
+      fileName: _parseNullableString(json['fileName'] ?? json['file_name']),
+      fileExtension: _parseNullableString(
+        json['fileExtension'] ?? json['file_extension'],
+      ),
+      contentType: _parseNullableString(
+        json['contentType'] ?? json['content_type'],
+      ),
+    );
+  }
+}
+
+class ItemPriceModel {
+  const ItemPriceModel({
+    required this.slotId,
+    required this.categoryNo,
+    required this.categoryCode,
+    required this.categoryName,
+    required this.basePrice,
+    required this.discountPercent,
+    required this.finalPrice,
+    this.effectiveDate,
+  });
+
+  final int slotId;
+  final int categoryNo;
+  final String categoryCode;
+  final String categoryName;
+  final double basePrice;
+  final double discountPercent;
+  final double finalPrice;
+  final String? effectiveDate;
+
+  factory ItemPriceModel.fromJson(Map<String, dynamic> json) {
+    return ItemPriceModel(
+      slotId: _parseInt(json['slotId'] ?? json['slot_id']),
+      categoryNo: _parseInt(json['categoryNo'] ?? json['category_no']),
+      categoryCode: (json['categoryCode'] ?? json['category_code'] ?? '')
+          .toString(),
+      categoryName: (json['categoryName'] ?? json['category_name'] ?? '')
+          .toString(),
+      basePrice: _parseDouble(json['basePrice'] ?? json['base_price']),
+      discountPercent: _parseDouble(
+        json['discountPercent'] ?? json['discount_percent'],
+      ),
+      finalPrice: _parseDouble(json['finalPrice'] ?? json['final_price']),
+      effectiveDate: _parseNullableString(
+        json['effectiveDate'] ?? json['effective_date'],
+      ),
+    );
+  }
+}
+
+class MergedItemDetailModel {
+  const MergedItemDetailModel({
+    required this.itemCode,
+    required this.itemName,
+    required this.itemGroup,
+    required this.totalQuantity,
+    required this.totalQuantityValue,
+    required this.serverQuantities,
+    required this.prices,
+    required this.warnings,
+    this.itemMasterCode,
+    this.qrCode,
+    this.hsnCode,
+    this.image,
+    this.supportItemCodes = const <String>[],
+  });
+
+  final int? itemMasterCode;
+  final String itemCode;
+  final String itemName;
+  final String itemGroup;
+  final String? qrCode;
+  final String? hsnCode;
+  final double totalQuantity;
+  final double totalQuantityValue;
+  final Map<String, double> serverQuantities;
+  final ItemImageModel? image;
+  final List<ItemPriceModel> prices;
+  final List<String> supportItemCodes;
+  final List<String> warnings;
+
+  ItemPriceModel priceFor(PriceCategoryModel? category) {
+    if (category == null) {
+      return const ItemPriceModel(
+        slotId: 0,
+        categoryNo: 0,
+        categoryCode: '',
+        categoryName: 'No Category',
+        basePrice: 0,
+        discountPercent: 0,
+        finalPrice: 0,
+      );
+    }
+
+    for (final price in prices) {
+      if (price.categoryNo == category.categoryNo ||
+          price.slotId == category.slotId ||
+          price.categoryCode.toLowerCase() ==
+              category.categoryCode.toLowerCase() ||
+          price.categoryName.toLowerCase() ==
+              category.categoryName.toLowerCase()) {
+        return price;
+      }
+    }
+
+    return ItemPriceModel(
+      slotId: category.slotId,
+      categoryNo: category.categoryNo,
+      categoryCode: category.categoryCode,
+      categoryName: category.categoryName,
+      basePrice: 0,
+      discountPercent: 0,
+      finalPrice: 0,
+    );
+  }
+
+  double quantityForServer(String serverName) =>
+      serverQuantities[serverName] ?? 0;
+
+  int get availableOrderQuantity => totalQuantity.floor();
+}
+
+class CartItemModel {
+  const CartItemModel({
+    required this.itemCode,
+    required this.itemName,
+    required this.itemGroup,
+    required this.quantity,
+    required this.availableQuantity,
+    required this.serverQuantities,
+    required this.prices,
+    this.itemMasterCode,
+    this.qrCode,
+    this.hsnCode,
+    this.imageUrl,
+  });
+
+  final int? itemMasterCode;
+  final String itemCode;
+  final String itemName;
+  final String itemGroup;
+  final String? qrCode;
+  final String? hsnCode;
+  final String? imageUrl;
+  final int quantity;
+  final int availableQuantity;
+  final Map<String, double> serverQuantities;
+  final List<ItemPriceModel> prices;
+
+  String get key =>
+      itemCode.trim().isNotEmpty ? itemCode.trim() : itemName.trim();
+
+  CartItemModel copyWith({
+    int? itemMasterCode,
+    String? itemCode,
+    String? itemName,
+    String? itemGroup,
+    String? qrCode,
+    String? hsnCode,
+    String? imageUrl,
+    int? quantity,
+    int? availableQuantity,
+    Map<String, double>? serverQuantities,
+    List<ItemPriceModel>? prices,
+  }) {
+    return CartItemModel(
+      itemMasterCode: itemMasterCode ?? this.itemMasterCode,
+      itemCode: itemCode ?? this.itemCode,
+      itemName: itemName ?? this.itemName,
+      itemGroup: itemGroup ?? this.itemGroup,
+      qrCode: qrCode ?? this.qrCode,
+      hsnCode: hsnCode ?? this.hsnCode,
+      imageUrl: imageUrl ?? this.imageUrl,
+      quantity: quantity ?? this.quantity,
+      availableQuantity: availableQuantity ?? this.availableQuantity,
+      serverQuantities: serverQuantities ?? this.serverQuantities,
+      prices: prices ?? this.prices,
+    );
+  }
+
+  factory CartItemModel.fromDetail(
+    MergedItemDetailModel detail, {
+    required int quantity,
+  }) {
+    return CartItemModel(
+      itemMasterCode: detail.itemMasterCode,
+      itemCode: detail.itemCode,
+      itemName: detail.itemName,
+      itemGroup: detail.itemGroup,
+      qrCode: detail.qrCode,
+      hsnCode: detail.hsnCode,
+      imageUrl: detail.image?.url,
+      quantity: quantity,
+      availableQuantity: detail.availableOrderQuantity,
+      serverQuantities: detail.serverQuantities,
+      prices: detail.prices,
+    );
+  }
+
+  ItemPriceModel priceFor(PriceCategoryModel? category) {
+    return MergedItemDetailModel(
+      itemMasterCode: itemMasterCode,
+      itemCode: itemCode,
+      itemName: itemName,
+      itemGroup: itemGroup,
+      qrCode: qrCode,
+      hsnCode: hsnCode,
+      totalQuantity: availableQuantity.toDouble(),
+      totalQuantityValue: 0,
+      serverQuantities: serverQuantities,
+      prices: prices,
+      warnings: const <String>[],
+    ).priceFor(category);
+  }
+}
+
 class DraftOrderItem {
   const DraftOrderItem({
     required this.itemCode,
@@ -194,6 +485,17 @@ int _parseInt(dynamic value) {
     return 0;
   }
   return int.tryParse(text) ?? double.tryParse(text)?.toInt() ?? 0;
+}
+
+double _parseDouble(dynamic value) {
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is num) return value.toDouble();
+  final text = value?.toString().trim() ?? '';
+  if (text.isEmpty) {
+    return 0;
+  }
+  return double.tryParse(text) ?? 0;
 }
 
 String? _parseNullableString(dynamic value) {

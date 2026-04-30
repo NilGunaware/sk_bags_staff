@@ -48,27 +48,84 @@ class LocalItemSyncService extends GetxService {
   }
 
   Future<MergedItemDetailModel> fetchItemDetailByLookup(String lookup) async {
-    final trimmedLookup = lookup.trim();
-    if (trimmedLookup.isEmpty) {
+    final lookupCandidates = _buildLookupCandidates(lookup);
+    if (lookupCandidates.isEmpty) {
       throw Exception('Enter a QR code or item code.');
     }
 
-    final outcomes = await Future.wait(
-      _servers.map(
-        (server) => _fetchJsonOutcome(
-          serverName: server.name,
-          baseUrl: server.baseUrl,
-          endpointPath:
-              '/api/items/detail/${Uri.encodeComponent(trimmedLookup)}',
-        ),
-      ),
-    );
+    var anyReachableServer = false;
+    var lastOutcomes = const <_FetchOutcome>[];
 
-    final successful = outcomes
-        .where((outcome) => outcome.response != null)
-        .toList();
-    if (successful.isEmpty) {
-      final reachableCount = outcomes
+    for (final candidate in lookupCandidates) {
+      final outcomes = await Future.wait(
+        _servers.map(
+          (server) => _fetchJsonOutcome(
+            serverName: server.name,
+            baseUrl: server.baseUrl,
+            endpointPath: '/api/items/detail/${Uri.encodeComponent(candidate)}',
+          ),
+        ),
+      );
+      lastOutcomes = outcomes;
+      anyReachableServer =
+          anyReachableServer || outcomes.any((outcome) => outcome.isReachable);
+
+      final successful = outcomes
+          .where((outcome) => outcome.response != null)
+          .toList();
+      if (successful.isEmpty) {
+        continue;
+      }
+
+      final warnings = <String>[
+        for (final outcome in outcomes)
+          if (!outcome.isReachable)
+            '${outcome.serverName} server is unavailable right now.',
+      ];
+
+      MergedItemDetailModel? mergedDetail;
+      for (final outcome in successful) {
+        final response = outcome.response!;
+        final rawData = response['data'];
+        if (rawData is! Map) {
+          continue;
+        }
+
+        final detail = _buildItemDetailFromServer(
+          Map<String, dynamic>.from(rawData),
+          serverName: outcome.serverName,
+          baseUrl: outcome.baseUrl,
+        );
+
+        mergedDetail = mergedDetail == null
+            ? detail
+            : _mergeItemDetails(mergedDetail, detail);
+      }
+
+      if (mergedDetail == null) {
+        continue;
+      }
+
+      return MergedItemDetailModel(
+        itemMasterCode: mergedDetail.itemMasterCode,
+        itemCode: mergedDetail.itemCode,
+        itemName: mergedDetail.itemName,
+        itemGroup: mergedDetail.itemGroup,
+        qrCode: mergedDetail.qrCode,
+        hsnCode: mergedDetail.hsnCode,
+        totalQuantity: mergedDetail.totalQuantity,
+        totalQuantityValue: mergedDetail.totalQuantityValue,
+        serverQuantities: mergedDetail.serverQuantities,
+        serverBranchStocks: mergedDetail.serverBranchStocks,
+        image: mergedDetail.image,
+        prices: mergedDetail.prices,
+        supportItemCodes: mergedDetail.supportItemCodes,
+        warnings: warnings,
+      );
+    }
+
+    if (!anyReachableServer) {
+      final reachableCount = lastOutcomes
           .where((outcome) => outcome.isReachable)
           .length;
       if (reachableCount == 0) {
@@ -76,53 +133,9 @@ class LocalItemSyncService extends GetxService {
           'Item servers are unavailable right now. Check the dashboard status.',
         );
       }
-      throw Exception('No item matched this QR code.');
     }
 
-    final warnings = <String>[
-      for (final outcome in outcomes)
-        if (!outcome.isReachable)
-          '${outcome.serverName} server is unavailable right now.',
-    ];
-
-    MergedItemDetailModel? mergedDetail;
-    for (final outcome in successful) {
-      final response = outcome.response!;
-      final rawData = response['data'];
-      if (rawData is! Map) {
-        continue;
-      }
-
-      final detail = _buildItemDetailFromServer(
-        Map<String, dynamic>.from(rawData),
-        serverName: outcome.serverName,
-        baseUrl: outcome.baseUrl,
-      );
-
-      mergedDetail = mergedDetail == null
-          ? detail
-          : _mergeItemDetails(mergedDetail, detail);
-    }
-
-    if (mergedDetail == null) {
-      throw Exception('No item matched this QR code.');
-    }
-
-    return MergedItemDetailModel(
-      itemMasterCode: mergedDetail.itemMasterCode,
-      itemCode: mergedDetail.itemCode,
-      itemName: mergedDetail.itemName,
-      itemGroup: mergedDetail.itemGroup,
-      qrCode: mergedDetail.qrCode,
-      hsnCode: mergedDetail.hsnCode,
-      totalQuantity: mergedDetail.totalQuantity,
-      totalQuantityValue: mergedDetail.totalQuantityValue,
-      serverQuantities: mergedDetail.serverQuantities,
-      image: mergedDetail.image,
-      prices: mergedDetail.prices,
-      supportItemCodes: mergedDetail.supportItemCodes,
-      warnings: warnings,
-    );
+    throw Exception('No item matched this QR code.');
   }
 
   Future<MergedItemPage> searchItems({
@@ -402,6 +415,18 @@ class LocalItemSyncService extends GetxService {
           json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
         ),
       },
+      serverBranchStocks: <String, List<BranchStockModel>>{
+        serverName: json['branchStocks'] is List
+            ? (json['branchStocks'] as List)
+                  .whereType<Map>()
+                  .map(
+                    (item) => BranchStockModel.fromJson(
+                      Map<String, dynamic>.from(item),
+                    ),
+                  )
+                  .toList()
+            : const <BranchStockModel>[],
+      },
       image: imageJson is Map
           ? ItemImageModel.fromJson(
               Map<String, dynamic>.from(imageJson),
@@ -435,6 +460,10 @@ class LocalItemSyncService extends GetxService {
     secondary.serverQuantities.forEach((server, quantity) {
       mergedQuantities[server] = (mergedQuantities[server] ?? 0) + quantity;
     });
+    final mergedBranchStocks = <String, List<BranchStockModel>>{
+      ...primary.serverBranchStocks,
+      ...secondary.serverBranchStocks,
+    };
 
     final mergedPrices = <String, ItemPriceModel>{};
     for (final price in [...primary.prices, ...secondary.prices]) {
@@ -468,6 +497,7 @@ class LocalItemSyncService extends GetxService {
       totalQuantityValue:
           primary.totalQuantityValue + secondary.totalQuantityValue,
       serverQuantities: mergedQuantities,
+      serverBranchStocks: mergedBranchStocks,
       image: image,
       prices: mergedPrices.values.toList()
         ..sort((a, b) => a.categoryNo.compareTo(b.categoryNo)),
@@ -525,6 +555,60 @@ class LocalItemSyncService extends GetxService {
     final itemName = item['itemName']?.toString().trim() ?? '';
     final qrCode = item['qrCode']?.toString().trim() ?? '';
     return '$itemCode|$itemName|$qrCode';
+  }
+
+  List<String> _buildLookupCandidates(String lookup) {
+    final candidates = <String>[];
+
+    void addCandidate(String? value) {
+      final normalized = value?.trim() ?? '';
+      if (normalized.isEmpty || candidates.contains(normalized)) {
+        return;
+      }
+      candidates.add(normalized);
+    }
+
+    final trimmed = lookup.trim();
+    addCandidate(trimmed);
+    addCandidate(trimmed.replaceAll(RegExp(r'\s+'), ''));
+
+    final possibleUri = Uri.tryParse(trimmed);
+    if (possibleUri != null) {
+      addCandidate(possibleUri.queryParameters['code']);
+      addCandidate(possibleUri.queryParameters['itemCode']);
+      addCandidate(possibleUri.queryParameters['item_code']);
+      addCandidate(possibleUri.queryParameters['qr']);
+      addCandidate(possibleUri.queryParameters['qrCode']);
+      addCandidate(possibleUri.queryParameters['qrcode']);
+      if (possibleUri.pathSegments.isNotEmpty) {
+        addCandidate(possibleUri.pathSegments.last);
+      }
+    }
+
+    if (trimmed.contains('/')) {
+      addCandidate(trimmed.split('/').last);
+    }
+    if (trimmed.contains('\\')) {
+      addCandidate(trimmed.split('\\').last);
+    }
+    if (trimmed.contains(':')) {
+      addCandidate(trimmed.split(':').last);
+    }
+    if (trimmed.contains('=')) {
+      addCandidate(trimmed.split('=').last);
+    }
+
+    final digitsOnly = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.length >= 3) {
+      addCandidate(digitsOnly);
+    }
+
+    final alphaNumeric = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+    if (alphaNumeric.length >= 3) {
+      addCandidate(alphaNumeric);
+    }
+
+    return candidates;
   }
 }
 

@@ -17,6 +17,8 @@ import '../../data/providers/api_provider.dart';
 import '../../routes/app_routes.dart';
 import '../auth/controllers/auth_controller.dart';
 
+enum DashboardModule { physicalStock, billing, liveStock }
+
 class HomeController extends GetxController {
   final AuthController authController = Get.find<AuthController>();
   final ApiProvider _apiProvider = Get.find<ApiProvider>();
@@ -58,6 +60,7 @@ class HomeController extends GetxController {
   final priceCategoryError = RxnString();
   final isLookingUpItem = false.obs;
   final isPlacingCartOrder = false.obs;
+  final activeDashboardModule = DashboardModule.physicalStock.obs;
 
   Timer? _serverHealthTimer;
 
@@ -67,6 +70,10 @@ class HomeController extends GetxController {
   int get cartCount => cartService.lineCount;
   int get cartTotalQuantity => cartService.totalQuantity;
   double get cartTotalAmount => cartService.totalAmount;
+
+  void setActiveDashboardModule(DashboardModule module) {
+    activeDashboardModule.value = module;
+  }
 
   bool canDeleteStockItem(Map<String, dynamic> item) {
     return item['is_delete']?.toString() == '1';
@@ -122,9 +129,15 @@ class HomeController extends GetxController {
     }
   }
 
-  void addToCart(MergedItemDetailModel detail, {int quantity = 1}) {
+  void addToCart(
+    MergedItemDetailModel detail, {
+    int quantity = 1,
+    bool showSuccessMessage = true,
+  }) {
     cartService.addFromDetail(detail, quantity: quantity);
-    ApiResponseHandler.showSuccessSnackbar('Added to cart');
+    if (showSuccessMessage) {
+      ApiResponseHandler.showSuccessSnackbar('Added to cart');
+    }
   }
 
   void updateCartItemQuantity(CartItemModel item, int quantity) {

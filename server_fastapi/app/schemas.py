@@ -97,6 +97,13 @@ class ItemReferencePricing(BaseModel):
     valueD5: float | None = None
 
 
+class BranchStockInfo(BaseModel):
+    branchCode: int
+    branchName: str
+    itemQuantity: float
+    itemQuantityValue: float
+
+
 class ItemDetail(BaseModel):
     itemMasterCode: int
     itemCode: str | None = None
@@ -114,6 +121,7 @@ class ItemDetail(BaseModel):
     supportItemCodes: list[str] = Field(default_factory=list)
     image: ItemImageInfo
     prices: list[ItemPriceRow] = Field(default_factory=list)
+    branchStocks: list[BranchStockInfo] = Field(default_factory=list)
     referencePricing: ItemReferencePricing | None = None
 
 

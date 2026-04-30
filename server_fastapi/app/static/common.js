@@ -240,12 +240,27 @@
           <strong>${formatDate(detail.referencePricing.effectiveDate)}</strong>
         </div>
       `
-      : `
+        : `
         <div class="detail-metric">
           <span>Reference Row</span>
           <strong>-</strong>
         </div>
       `;
+
+    const branchStockRows = (detail.branchStocks || []).length
+      ? detail.branchStocks
+          .map(
+            (branch) => `
+              <tr>
+                <td>${escapeHtml(branch.branchName || "-")}</td>
+                <td>${escapeHtml(String(branch.branchCode ?? "-"))}</td>
+                <td>${formatNumber(branch.itemQuantity || 0)}</td>
+                <td>${formatNumber(branch.itemQuantityValue || 0)}</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : `<tr><td class="empty" colspan="4">No branch-wise stock rows found for this item.</td></tr>`;
 
     return `
       <article class="item-detail-card">
@@ -313,6 +328,25 @@
                 </tr>
               </thead>
               <tbody>${priceRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="panel-subhead">
+            <p class="eyebrow">Branch Stock</p>
+          </div>
+          <div class="table-shell compact-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Branch</th>
+                  <th>Code</th>
+                  <th>Qty</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>${branchStockRows}</tbody>
             </table>
           </div>
         </div>

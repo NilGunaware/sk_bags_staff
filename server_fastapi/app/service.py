@@ -97,7 +97,6 @@ PREFERRED_IMAGE_EXTENSIONS = {
     ".heif",
 }
 
-
 ENSURE_ORDER_SCHEMA_SQL = """
 IF OBJECT_ID('dbo.ApiOrders', 'U') IS NULL
 BEGIN
@@ -295,6 +294,31 @@ def _resolve_item_image(item_code: str, support_codes: list[str]) -> tuple[dict[
         },
         None,
     )
+
+
+def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, Any]]:
+    cursor.execute(
+        """
+        SELECT
+            b.Code AS branchCode,
+            b.Name AS branchName,
+            SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
+            SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
+        FROM dbo.Tran4 t
+        INNER JOIN dbo.Master1 b
+            ON b.MasterType = 11
+           AND b.Code = t.MasterCode2
+        WHERE t.RecType = 0
+          AND t.MasterCode1 = %(item_master_code)s
+        GROUP BY b.Code, b.Name
+        HAVING
+            ABS(SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2)))) > 0
+            OR ABS(SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2)))) > 0
+        ORDER BY b.Name ASC;
+        """,
+        {"item_master_code": item_master_code},
+    )
+    return [_serialize_row(row) for row in rows_to_dicts(cursor)]
 
 
 def _load_price_category_names(cursor: Any) -> dict[int, str]:
@@ -547,6 +571,7 @@ def _build_item_detail(cursor: Any, item_lookup: str) -> tuple[dict[str, Any] | 
         return None, None
 
     header = _serialize_row(header_rows[0])
+    branch_stocks = _load_branch_stocks(cursor, int(reference["itemMasterCode"]))
 
     cursor.execute(
         """
@@ -628,6 +653,7 @@ def _build_item_detail(cursor: Any, item_lookup: str) -> tuple[dict[str, Any] | 
         "supportItemCodes": support_item_codes,
         "image": image,
         "prices": prices,
+        "branchStocks": branch_stocks,
         "referencePricing": reference_pricing,
     }
     return detail, image_path

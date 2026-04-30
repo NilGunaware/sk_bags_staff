@@ -3,7 +3,9 @@ import 'package:get/get.dart';
 
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
+import '../../routes/app_routes.dart';
 import 'home_controller.dart';
 
 class ScannedItemDetailView extends StatefulWidget {
@@ -50,8 +52,19 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                   onPressed: detail.availableOrderQuantity <= 0
                       ? null
                       : () {
-                          controller.addToCart(detail, quantity: quantity);
-                          Get.back();
+                          controller.addToCart(
+                            detail,
+                            quantity: quantity,
+                            showSuccessMessage: false,
+                          );
+                          Get.until(
+                            (route) =>
+                                route.settings.name == Routes.home ||
+                                route.isFirst,
+                          );
+                          ApiResponseHandler.showSuccessSnackbar(
+                            'Added to cart',
+                          );
                         },
                   icon: const Icon(Icons.add_shopping_cart_outlined),
                   label: const Text('Add To Cart'),

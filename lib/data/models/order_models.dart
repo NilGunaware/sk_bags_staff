@@ -281,6 +281,35 @@ class ItemPriceModel {
   }
 }
 
+class BranchStockModel {
+  const BranchStockModel({
+    required this.branchCode,
+    required this.branchName,
+    required this.quantity,
+    required this.quantityValue,
+  });
+
+  final int branchCode;
+  final String branchName;
+  final double quantity;
+  final double quantityValue;
+
+  factory BranchStockModel.fromJson(Map<String, dynamic> json) {
+    return BranchStockModel(
+      branchCode: _parseInt(json['branchCode'] ?? json['branch_code']),
+      branchName: (json['branchName'] ?? json['branch_name'] ?? '').toString(),
+      quantity: _parseDouble(
+        json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
+      ),
+      quantityValue: _parseDouble(
+        json['itemQuantityValue'] ??
+            json['quantityValue'] ??
+            json['item_quantity_value'],
+      ),
+    );
+  }
+}
+
 class MergedItemDetailModel {
   const MergedItemDetailModel({
     required this.itemCode,
@@ -289,6 +318,7 @@ class MergedItemDetailModel {
     required this.totalQuantity,
     required this.totalQuantityValue,
     required this.serverQuantities,
+    required this.serverBranchStocks,
     required this.prices,
     required this.warnings,
     this.itemMasterCode,
@@ -307,6 +337,7 @@ class MergedItemDetailModel {
   final double totalQuantity;
   final double totalQuantityValue;
   final Map<String, double> serverQuantities;
+  final Map<String, List<BranchStockModel>> serverBranchStocks;
   final ItemImageModel? image;
   final List<ItemPriceModel> prices;
   final List<String> supportItemCodes;
@@ -349,6 +380,9 @@ class MergedItemDetailModel {
 
   double quantityForServer(String serverName) =>
       serverQuantities[serverName] ?? 0;
+
+  List<BranchStockModel> branchesForServer(String serverName) =>
+      serverBranchStocks[serverName] ?? const <BranchStockModel>[];
 
   int get availableOrderQuantity => totalQuantity.floor();
 }
@@ -441,6 +475,7 @@ class CartItemModel {
       totalQuantity: availableQuantity.toDouble(),
       totalQuantityValue: 0,
       serverQuantities: serverQuantities,
+      serverBranchStocks: const <String, List<BranchStockModel>>{},
       prices: prices,
       warnings: const <String>[],
     ).priceFor(category);

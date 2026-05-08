@@ -1,8 +1,8 @@
 class ApiEndpoints {
   static const String interlinkServerUrl = 'https://interlinkpos.com';
   static const String baseUrl = '$interlinkServerUrl/sk_bags/api/v1';
-  static const String ahmLabel = 'AHM';
-  static const String bhuLabel = 'BHU';
+  static const String ahmLabel = 'SK ENTERPRISE';
+  static const String bhuLabel = 'SS MOVE ON THRILL BAGS LLP';
   static const String ahmItemsBaseUrl = 'http://182.70.120.80:8008';
   static const String bhuItemsBaseUrl = 'http://150.107.237.206:8009';
 

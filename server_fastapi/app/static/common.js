@@ -247,18 +247,26 @@
         </div>
       `;
 
-    const branchStockRows = (detail.branchStocks || []).length
+    const branchStocks = detail.branchStocks || [];
+    const branchStockRows = branchStocks.length
       ? detail.branchStocks
-          .map(
-            (branch) => `
-              <tr>
+          .map((branch) => {
+            const quantity = Number(branch.itemQuantity || 0);
+            const value = Number(branch.itemQuantityValue || 0);
+            const isZero = quantity === 0 && value === 0;
+            return `
+              <tr class="${isZero ? "is-zero-stock" : ""}">
                 <td>${escapeHtml(branch.branchName || "-")}</td>
                 <td>${escapeHtml(String(branch.branchCode ?? "-"))}</td>
-                <td>${formatNumber(branch.itemQuantity || 0)}</td>
-                <td>${formatNumber(branch.itemQuantityValue || 0)}</td>
+                <td>
+                  <span class="stock-value ${isZero ? "is-zero" : ""}">
+                    ${formatNumber(quantity)}
+                  </span>
+                </td>
+                <td>${formatNumber(value)}</td>
               </tr>
-            `,
-          )
+            `;
+          })
           .join("")
       : `<tr><td class="empty" colspan="4">No branch-wise stock rows found for this item.</td></tr>`;
 
@@ -335,6 +343,7 @@
         <div class="detail-section">
           <div class="panel-subhead">
             <p class="eyebrow">Branch Stock</p>
+            <span class="muted-copy">${formatNumber(branchStocks.length)} branch(es)</span>
           </div>
           <div class="table-shell compact-table">
             <table>

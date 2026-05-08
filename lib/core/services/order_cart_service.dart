@@ -69,6 +69,7 @@ class OrderCartService extends GetxService {
         serverQuantities: detail.serverQuantities,
         prices: detail.prices,
         imageUrl: detail.image?.url,
+        imageUrls: detail.imageUrls,
       );
       items.refresh();
       return;

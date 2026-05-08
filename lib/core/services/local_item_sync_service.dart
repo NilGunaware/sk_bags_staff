@@ -118,6 +118,7 @@ class LocalItemSyncService extends GetxService {
         serverQuantities: mergedDetail.serverQuantities,
         serverBranchStocks: mergedDetail.serverBranchStocks,
         image: mergedDetail.image,
+        imageUrls: mergedDetail.imageUrls,
         prices: mergedDetail.prices,
         supportItemCodes: mergedDetail.supportItemCodes,
         warnings: warnings,
@@ -395,6 +396,17 @@ class LocalItemSyncService extends GetxService {
   }) {
     final imageJson = json['image'];
     final pricesJson = json['prices'];
+    final image = imageJson is Map
+        ? ItemImageModel.fromJson(
+            Map<String, dynamic>.from(imageJson),
+            baseUrl: baseUrl,
+          )
+        : null;
+    final imageUrls = <String>[
+      if ((image?.available ?? false) && (image?.url?.isNotEmpty ?? false))
+        image!.url!,
+    ];
+
     return MergedItemDetailModel(
       itemMasterCode: _parseInt(
         json['itemMasterCode'] ?? json['item_master_code'],
@@ -427,12 +439,8 @@ class LocalItemSyncService extends GetxService {
                   .toList()
             : const <BranchStockModel>[],
       },
-      image: imageJson is Map
-          ? ItemImageModel.fromJson(
-              Map<String, dynamic>.from(imageJson),
-              baseUrl: baseUrl,
-            )
-          : null,
+      image: image,
+      imageUrls: imageUrls,
       prices: pricesJson is List
           ? pricesJson
                 .whereType<Map>()
@@ -476,6 +484,11 @@ class LocalItemSyncService extends GetxService {
       ...secondary.supportItemCodes,
     }.toList();
 
+    final imageUrls = <String>{
+      ...primary.imageUrls,
+      ...secondary.imageUrls,
+    }.where((url) => url.trim().isNotEmpty).toList();
+
     final image = (primary.image?.available ?? false)
         ? primary.image
         : secondary.image;
@@ -499,6 +512,7 @@ class LocalItemSyncService extends GetxService {
       serverQuantities: mergedQuantities,
       serverBranchStocks: mergedBranchStocks,
       image: image,
+      imageUrls: imageUrls,
       prices: mergedPrices.values.toList()
         ..sort((a, b) => a.categoryNo.compareTo(b.categoryNo)),
       supportItemCodes: mergedSupportCodes,

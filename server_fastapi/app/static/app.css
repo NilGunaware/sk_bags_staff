@@ -442,6 +442,24 @@ tbody tr:hover {
   background: rgba(245, 231, 214, 0.38);
 }
 
+tbody tr.is-zero-stock {
+  color: var(--muted);
+  background: rgba(248, 248, 248, 0.58);
+}
+
+tbody tr.is-zero-stock:hover {
+  background: rgba(238, 238, 238, 0.72);
+}
+
+.stock-value {
+  font-weight: 800;
+  color: var(--accent-deep);
+}
+
+.stock-value.is-zero {
+  color: var(--muted);
+}
+
 .empty {
   color: var(--muted);
 }

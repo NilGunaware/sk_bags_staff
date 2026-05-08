@@ -325,6 +325,7 @@ class MergedItemDetailModel {
     this.qrCode,
     this.hsnCode,
     this.image,
+    this.imageUrls = const <String>[],
     this.supportItemCodes = const <String>[],
   });
 
@@ -339,6 +340,7 @@ class MergedItemDetailModel {
   final Map<String, double> serverQuantities;
   final Map<String, List<BranchStockModel>> serverBranchStocks;
   final ItemImageModel? image;
+  final List<String> imageUrls;
   final List<ItemPriceModel> prices;
   final List<String> supportItemCodes;
   final List<String> warnings;
@@ -400,6 +402,7 @@ class CartItemModel {
     this.qrCode,
     this.hsnCode,
     this.imageUrl,
+    this.imageUrls = const <String>[],
   });
 
   final int? itemMasterCode;
@@ -409,6 +412,7 @@ class CartItemModel {
   final String? qrCode;
   final String? hsnCode;
   final String? imageUrl;
+  final List<String> imageUrls;
   final int quantity;
   final int availableQuantity;
   final Map<String, double> serverQuantities;
@@ -425,6 +429,7 @@ class CartItemModel {
     String? qrCode,
     String? hsnCode,
     String? imageUrl,
+    List<String>? imageUrls,
     int? quantity,
     int? availableQuantity,
     Map<String, double>? serverQuantities,
@@ -438,6 +443,7 @@ class CartItemModel {
       qrCode: qrCode ?? this.qrCode,
       hsnCode: hsnCode ?? this.hsnCode,
       imageUrl: imageUrl ?? this.imageUrl,
+      imageUrls: imageUrls ?? this.imageUrls,
       quantity: quantity ?? this.quantity,
       availableQuantity: availableQuantity ?? this.availableQuantity,
       serverQuantities: serverQuantities ?? this.serverQuantities,
@@ -457,6 +463,7 @@ class CartItemModel {
       qrCode: detail.qrCode,
       hsnCode: detail.hsnCode,
       imageUrl: detail.image?.url,
+      imageUrls: detail.imageUrls,
       quantity: quantity,
       availableQuantity: detail.availableOrderQuantity,
       serverQuantities: detail.serverQuantities,
@@ -472,6 +479,7 @@ class CartItemModel {
       itemGroup: itemGroup,
       qrCode: qrCode,
       hsnCode: hsnCode,
+      imageUrls: imageUrls,
       totalQuantity: availableQuantity.toDouble(),
       totalQuantityValue: 0,
       serverQuantities: serverQuantities,

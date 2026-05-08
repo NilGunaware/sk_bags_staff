@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
 import '../../routes/app_routes.dart';
+import 'fallback_network_image.dart';
 import 'home_controller.dart';
 
 class ScannedItemDetailView extends StatefulWidget {
@@ -230,8 +231,6 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = detail.image?.url;
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -250,22 +249,15 @@ class _HeroCard extends StatelessWidget {
                   width: 98,
                   height: 98,
                   color: Colors.white.withValues(alpha: 0.08),
-                  child: imageUrl == null || imageUrl.isEmpty
-                      ? const Icon(
-                          Icons.image_not_supported_outlined,
-                          color: Colors.white70,
-                          size: 36,
-                        )
-                      : Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                                Icons.image_not_supported_outlined,
-                                color: Colors.white70,
-                                size: 36,
-                              ),
-                        ),
+                  child: FallbackNetworkImage(
+                    imageUrls: [
+                      ...detail.imageUrls,
+                      if ((detail.image?.url ?? '').isNotEmpty)
+                        detail.image!.url!,
+                    ],
+                    iconColor: Colors.white70,
+                    iconSize: 36,
+                  ),
                 ),
               ),
               const SizedBox(width: 14),

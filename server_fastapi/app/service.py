@@ -302,19 +302,16 @@ def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, An
         SELECT
             b.Code AS branchCode,
             b.Name AS branchName,
-            SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
-            SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
-        FROM dbo.Tran4 t
-        INNER JOIN dbo.Master1 b
-            ON b.MasterType = 11
-           AND b.Code = t.MasterCode2
-        WHERE t.RecType = 0
-          AND t.MasterCode1 = %(item_master_code)s
+            COALESCE(SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))), 0) AS itemQuantity,
+            COALESCE(SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))), 0) AS itemQuantityValue
+        FROM dbo.Master1 b
+        LEFT JOIN dbo.Tran4 t
+            ON t.MasterCode2 = b.Code
+           AND t.RecType = 0
+           AND t.MasterCode1 = %(item_master_code)s
+        WHERE b.MasterType = 11
         GROUP BY b.Code, b.Name
-        HAVING
-            ABS(SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2)))) > 0
-            OR ABS(SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2)))) > 0
-        ORDER BY b.Name ASC;
+        ORDER BY b.Code ASC;
         """,
         {"item_master_code": item_master_code},
     )

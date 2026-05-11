@@ -217,16 +217,16 @@ class OrderListView extends GetView<OrderListController> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        extendedPadding: const EdgeInsets.symmetric(horizontal: 20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        onPressed: _openCreateOrder,
-        icon: const Icon(Icons.add),
-        label: const Text('Create Order'),
-      ),
+      // floatingActionButton: FloatingActionButton.extended(
+      //   backgroundColor: AppColors.primary,
+      //   foregroundColor: Colors.white,
+      //   elevation: 4,
+      //   extendedPadding: const EdgeInsets.symmetric(horizontal: 20),
+      //   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      //   onPressed: _openCreateOrder,
+      //   icon: const Icon(Icons.add),
+      //   label: const Text('Create Order'),
+      // ),
       body: SafeArea(
         child: Obx(() {
           controller.filtersVersion.value;
@@ -336,8 +336,15 @@ class OrderListView extends GetView<OrderListController> {
                     for (final order in orders) ...[
                       _OrderCard(
                         order: order,
-                        onTap: () =>
-                            Get.toNamed(Routes.orderDetail, arguments: order),
+                        onTap: () async {
+                          final result = await Get.toNamed(
+                            Routes.orderDetail,
+                            arguments: order,
+                          );
+                          if (result is Map && result['updated'] == true) {
+                            await controller.refreshOrders();
+                          }
+                        },
                       ),
                       const SizedBox(height: 10),
                     ],

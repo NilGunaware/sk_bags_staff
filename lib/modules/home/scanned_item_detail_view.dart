@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
-import '../../routes/app_routes.dart';
 import 'fallback_network_image.dart';
 import 'home_controller.dart';
 
@@ -21,11 +21,47 @@ class ScannedItemDetailView extends StatefulWidget {
 class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
   final HomeController controller = Get.find<HomeController>();
   late int quantity;
+  late final TextEditingController _quantityController;
 
   @override
   void initState() {
     super.initState();
     quantity = widget.detail.availableOrderQuantity > 0 ? 1 : 0;
+    _quantityController = TextEditingController(text: quantity.toString());
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  void _setQuantity(int nextQuantity, {bool syncInput = true}) {
+    final maxAllowed = widget.detail.availableOrderQuantity;
+    final clamped = maxAllowed <= 0
+        ? 0
+        : nextQuantity.clamp(1, maxAllowed).toInt();
+    setState(() => quantity = clamped);
+    if (syncInput) {
+      _quantityController.value = TextEditingValue(
+        text: clamped.toString(),
+        selection: TextSelection.collapsed(offset: clamped.toString().length),
+      );
+    }
+  }
+
+  void _handleQuantityInput(String value) {
+    final parsed = int.tryParse(value.trim());
+    if (parsed == null) {
+      setState(() => quantity = 0);
+      return;
+    }
+    final maxAllowed = widget.detail.availableOrderQuantity;
+    if (parsed > maxAllowed) {
+      _setQuantity(maxAllowed);
+      return;
+    }
+    setState(() => quantity = parsed);
   }
 
   @override
@@ -50,7 +86,10 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: detail.availableOrderQuantity <= 0
+                  onPressed:
+                      detail.availableOrderQuantity <= 0 ||
+                          quantity <= 0 ||
+                          quantity > detail.availableOrderQuantity
                       ? null
                       : () {
                           controller.addToCart(
@@ -58,11 +97,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                             quantity: quantity,
                             showSuccessMessage: false,
                           );
-                          Get.until(
-                            (route) =>
-                                route.settings.name == Routes.home ||
-                                route.isFirst,
-                          );
+                          Get.back(result: true);
                           ApiResponseHandler.showSuccessSnackbar(
                             'Added to cart',
                           );
@@ -86,7 +121,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
               _HeroCard(
                 detail: detail,
                 selectedCategoryName:
-                    selectedCategory?.categoryName ?? 'No Category',
+                    selectedCategory?.displayName ?? 'No Category',
                 selectedPrice: selectedPrice.finalPrice,
               ),
               const SizedBox(height: 16),
@@ -123,7 +158,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _MetricRow(
-                      label: selectedPrice.categoryName,
+                      label: selectedPrice.displayName,
                       value: _formatCurrency(selectedPrice.finalPrice),
                       emphasized: true,
                     ),
@@ -157,15 +192,33 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                         _StepButton(
                           icon: Icons.remove,
                           onTap: quantity > 1
-                              ? () => setState(() => quantity -= 1)
+                              ? () => _setQuantity(quantity - 1)
                               : null,
                         ),
                         Expanded(
-                          child: Center(
-                            child: Text(
-                              '$quantity',
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: TextField(
+                              controller: _quantityController,
+                              textAlign: TextAlign.center,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              onChanged: _handleQuantityInput,
+                              decoration: InputDecoration(
+                                labelText: 'Qty',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
                               style: const TextStyle(
-                                fontSize: 28,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.primary,
                               ),
@@ -175,7 +228,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                         _StepButton(
                           icon: Icons.add,
                           onTap: quantity < detail.availableOrderQuantity
-                              ? () => setState(() => quantity += 1)
+                              ? () => _setQuantity(quantity + 1)
                               : null,
                         ),
                       ],

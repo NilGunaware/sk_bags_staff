@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
@@ -337,7 +338,15 @@ class LocalItemSyncService extends GetxService {
       '$baseUrl$endpointPath',
     ).replace(queryParameters: queryParameters);
 
-    final response = await _client.get(uri).timeout(_serverTimeout);
+    _logApiRequest('GET', uri, body: <String, dynamic>{});
+    final http.Response response;
+    try {
+      response = await _client.get(uri).timeout(_serverTimeout);
+    } catch (error) {
+      _logApiError('GET', uri, error);
+      rethrow;
+    }
+    _logApiResponse(uri, response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw _HttpStatusException(response.statusCode);
     }
@@ -347,6 +356,42 @@ class LocalItemSyncService extends GetxService {
       return decoded;
     }
     throw Exception('Invalid item response');
+  }
+
+  void _logApiRequest(String method, Uri uri, {Object? body}) {
+    debugPrint('========== LOCAL API REQUEST ==========');
+    debugPrint('$method $uri');
+    debugPrint('Body: ${_formatJsonForLog(body ?? <String, dynamic>{})}');
+  }
+
+  void _logApiResponse(Uri uri, http.Response response) {
+    debugPrint('========== LOCAL API RESPONSE ==========');
+    debugPrint('GET $uri [${response.statusCode}]');
+    debugPrint('Body: ${_formatJsonForLog(response.body)}');
+  }
+
+  void _logApiError(String method, Uri uri, Object error) {
+    debugPrint('========== LOCAL API RESPONSE ==========');
+    debugPrint('$method $uri [ERROR]');
+    debugPrint('Body: ${_formatJsonForLog({'error': error.toString()})}');
+  }
+
+  String _formatJsonForLog(Object? value) {
+    try {
+      final dynamic jsonValue;
+      if (value == null) {
+        jsonValue = <String, dynamic>{};
+      } else if (value is String) {
+        jsonValue = value.trim().isEmpty
+            ? <String, dynamic>{}
+            : jsonDecode(value);
+      } else {
+        jsonValue = value;
+      }
+      return const JsonEncoder.withIndent('  ').convert(jsonValue);
+    } catch (_) {
+      return value?.toString() ?? '';
+    }
   }
 
   Future<_FetchOutcome> _fetchJsonOutcome({

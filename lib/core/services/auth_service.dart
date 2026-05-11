@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
@@ -34,13 +35,14 @@ class AuthService extends GetxService {
   Future<String?> refreshToken() async {
     final existingToken = await getAccessToken();
     if (existingToken == null || existingToken.isEmpty) {
-      print('[AuthService] refreshToken aborted: no stored token');
+      debugPrint('[AuthService] refreshToken aborted: no stored token');
       return null;
     }
 
-    final uri =
-        Uri.parse('${ApiEndpoints.baseUrl}${ApiEndpoints.refreshToken}');
-    print('[AuthService] Calling refresh token API: ${uri.toString()}');
+    final uri = Uri.parse(
+      '${ApiEndpoints.baseUrl}${ApiEndpoints.refreshToken}',
+    );
+    _logApiRequest('GET', uri, body: <String, dynamic>{});
     try {
       final response = await http.get(
         uri,
@@ -51,44 +53,72 @@ class AuthService extends GetxService {
           'Auth': 'Bearer $existingToken',
         },
       );
-
-      print(
-        '[AuthService] Refresh response [${response.statusCode}]: ${response.body}',
-      );
+      _logApiResponse('GET', uri, response.statusCode, response.body);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        print(
-            '[AuthService] Refresh token failed with status ${response.statusCode}');
+        debugPrint(
+          '[AuthService] Refresh token failed with status ${response.statusCode}',
+        );
         return null;
       }
 
       final Map<String, dynamic> body =
           jsonDecode(response.body) as Map<String, dynamic>;
-      final bool status = body['status'] == true ||
+      final bool status =
+          body['status'] == true ||
           body['success'] == true ||
           (body['code']?.toString() == '200');
       if (!status) {
         return null;
       }
 
-      final Map<String, dynamic>? data =
-          body['data'] is Map<String, dynamic> ? body['data'] : null;
+      final Map<String, dynamic>? data = body['data'] is Map<String, dynamic>
+          ? body['data']
+          : null;
       final String? newToken =
           data?['token']?.toString() ?? body['token']?.toString();
       if (newToken == null || newToken.isEmpty) {
-        print('[AuthService] Refresh token response missing token');
+        debugPrint('[AuthService] Refresh token response missing token');
         return null;
       }
 
       await saveTokens(newToken);
-      print('[AuthService] Refresh token succeeded and token saved');
+      debugPrint('[AuthService] Refresh token succeeded and token saved');
       return newToken;
     } catch (error, stackTrace) {
-      print('[AuthService] Refresh token error: $error');
-      print(stackTrace);
+      _logApiResponse('GET', uri, -1, {'error': error.toString()});
+      debugPrint('[AuthService] Refresh token error: $error\n$stackTrace');
       return null;
     }
   }
+
+  void _logApiRequest(String method, Uri uri, {Object? body}) {
+    debugPrint('========== AUTH API REQUEST ==========');
+    debugPrint('$method $uri');
+    debugPrint('Body: ${_formatJsonForLog(body ?? <String, dynamic>{})}');
+  }
+
+  void _logApiResponse(String method, Uri uri, int statusCode, Object? body) {
+    debugPrint('========== AUTH API RESPONSE ==========');
+    debugPrint('$method $uri [$statusCode]');
+    debugPrint('Body: ${_formatJsonForLog(body)}');
+  }
+
+  String _formatJsonForLog(Object? value) {
+    try {
+      final dynamic jsonValue;
+      if (value == null) {
+        jsonValue = <String, dynamic>{};
+      } else if (value is String) {
+        jsonValue = value.trim().isEmpty
+            ? <String, dynamic>{}
+            : jsonDecode(value);
+      } else {
+        jsonValue = value;
+      }
+      return const JsonEncoder.withIndent('  ').convert(jsonValue);
+    } catch (_) {
+      return value?.toString() ?? '';
+    }
+  }
 }
-
-

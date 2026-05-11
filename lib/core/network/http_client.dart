@@ -125,7 +125,7 @@ class HttpClient {
       );
     }
 
-    Future<http.Response> _sendMultipart(String? overrideToken) async {
+    Future<http.Response> sendMultipart(String? overrideToken) async {
       final request = http.MultipartRequest('POST', uri);
       final hdrs = await _getHeaders(additionalHeaders: headers);
       hdrs.remove('Content-Type');
@@ -145,23 +145,39 @@ class HttpClient {
         }
       }
 
-      final streamedResponse = await _client.send(request);
+      _logApiRequest(
+        'POST',
+        uri,
+        body: <String, dynamic>{
+          'fields': fields ?? <String, String>{},
+          'files': filePaths ?? <String, String>{},
+        },
+      );
+      final http.StreamedResponse streamedResponse;
+      try {
+        streamedResponse = await _client.send(request);
+      } catch (error) {
+        _logApiError('POST', uri, error);
+        rethrow;
+      }
       final responseBody = await streamedResponse.stream.bytesToString();
-      return http.Response(
+      final response = http.Response(
         responseBody,
         streamedResponse.statusCode,
         headers: streamedResponse.headers,
         request: http.Request('POST', uri),
       );
+      _logApiResponse(response);
+      return response;
     }
 
-    final initialResponse = await _sendMultipart(null);
+    final initialResponse = await sendMultipart(null);
     final probeRequest = http.Request('POST', uri);
     if (_shouldRefresh(initialResponse, probeRequest)) {
       try {
         final newToken = await _authService?.refreshToken();
         if (newToken != null && newToken.isNotEmpty) {
-          return await _sendMultipart(newToken);
+          return await sendMultipart(newToken);
         } else {
           await _logoutUser();
           return initialResponse;
@@ -175,7 +191,18 @@ class HttpClient {
   }
 
   Future<http.Response> _sendWithRefresh(http.Request request) async {
-    final streamedResponse = await _client.send(request);
+    _logApiRequest(
+      request.method,
+      request.url,
+      body: request.body.isEmpty ? <String, dynamic>{} : request.body,
+    );
+    final http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse = await _client.send(request);
+    } catch (error) {
+      _logApiError(request.method, request.url, error);
+      rethrow;
+    }
     final responseBody = await streamedResponse.stream.bytesToString();
     final response = http.Response(
       responseBody,
@@ -183,6 +210,7 @@ class HttpClient {
       headers: streamedResponse.headers,
       request: request,
     );
+    _logApiResponse(response);
 
     if (_shouldRefresh(response, request)) {
       return _handle401Error(request, response);
@@ -196,11 +224,13 @@ class HttpClient {
       return false;
     }
     if (response.statusCode == 401) {
-      print('[HttpClient] Received 401 for ${request.url.path}');
+      debugPrint('[HttpClient] Received 401 for ${request.url.path}');
       return true;
     }
     if (response.statusCode == 400 && _isTokenExpired(response.body)) {
-      print('[HttpClient] 400 with token expiration message for ${request.url.path}');
+      debugPrint(
+        '[HttpClient] 400 with token expiration message for ${request.url.path}',
+      );
       return true;
     }
     return false;
@@ -265,13 +295,17 @@ class HttpClient {
 
     if (!_isRefreshing) {
       _isRefreshing = true;
-      print('[HttpClient] Starting token refresh after ${originalRequest.url.path}');
+      debugPrint(
+        '[HttpClient] Starting token refresh after ${originalRequest.url.path}',
+      );
       try {
         final newToken = await _authService?.refreshToken();
         _isRefreshing = false;
 
         if (newToken != null && newToken.isNotEmpty) {
-          print('[HttpClient] Token refresh succeeded, retrying queued requests');
+          debugPrint(
+            '[HttpClient] Token refresh succeeded, retrying queued requests',
+          );
           await _retryPendingRequests(newToken);
           return _retryRequest(originalRequest, newToken);
         } else {
@@ -287,7 +321,9 @@ class HttpClient {
         return errorResponse;
       }
     } else {
-      print('[HttpClient] Refresh already in progress, queueing ${originalRequest.url.path}');
+      debugPrint(
+        '[HttpClient] Refresh already in progress, queueing ${originalRequest.url.path}',
+      );
       final completer = Completer<http.Response>();
       _pendingRequests.add(_PendingRequest(originalRequest, completer));
       return completer.future;
@@ -296,17 +332,25 @@ class HttpClient {
 
   Future<void> _retryPendingRequests(String token) async {
     for (final pending in _pendingRequests) {
+      final request = _cloneRequest(pending.request, token);
       try {
-        final request = _cloneRequest(pending.request, token);
+        _logApiRequest(
+          request.method,
+          request.url,
+          body: request.body.isEmpty ? <String, dynamic>{} : request.body,
+        );
         final response = await _client.send(request);
         final body = await response.stream.bytesToString();
-        pending.completer.complete(http.Response(
+        final completedResponse = http.Response(
           body,
           response.statusCode,
           headers: response.headers,
           request: request,
-        ));
+        );
+        _logApiResponse(completedResponse);
+        pending.completer.complete(completedResponse);
       } catch (error) {
+        _logApiError(request.method, request.url, error);
         pending.completer.completeError(error);
       }
     }
@@ -327,7 +371,18 @@ class HttpClient {
     String token,
   ) async {
     final newRequest = _cloneRequest(originalRequest, token);
-    final streamedResponse = await _client.send(newRequest);
+    _logApiRequest(
+      newRequest.method,
+      newRequest.url,
+      body: newRequest.body.isEmpty ? <String, dynamic>{} : newRequest.body,
+    );
+    final http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse = await _client.send(newRequest);
+    } catch (error) {
+      _logApiError(newRequest.method, newRequest.url, error);
+      rethrow;
+    }
     final responseBody = await streamedResponse.stream.bytesToString();
     final response = http.Response(
       responseBody,
@@ -335,6 +390,7 @@ class HttpClient {
       headers: streamedResponse.headers,
       request: newRequest,
     );
+    _logApiResponse(response);
 
     if (response.statusCode == 401 ||
         (response.statusCode == 400 && _isTokenExpired(response.body))) {
@@ -356,11 +412,49 @@ class HttpClient {
   }
 
   Future<void> _logoutUser() async {
-    print('[HttpClient] Logging out user due to invalid token');
+    debugPrint('[HttpClient] Logging out user due to invalid token');
     if (Get.isRegistered<AuthController>()) {
       await Get.find<AuthController>().clearSession();
     } else {
       await _authService?.clearTokens();
+    }
+  }
+
+  void _logApiRequest(String method, Uri uri, {Object? body}) {
+    debugPrint('========== API REQUEST ==========');
+    debugPrint('$method $uri');
+    debugPrint('Body: ${_formatJsonForLog(body ?? <String, dynamic>{})}');
+  }
+
+  void _logApiResponse(http.Response response) {
+    debugPrint('========== API RESPONSE ==========');
+    debugPrint(
+      '${response.request?.method ?? 'HTTP'} ${response.request?.url ?? ''} [${response.statusCode}]',
+    );
+    debugPrint('Body: ${_formatJsonForLog(response.body)}');
+  }
+
+  void _logApiError(String method, Uri uri, Object error) {
+    debugPrint('========== API RESPONSE ==========');
+    debugPrint('$method $uri [ERROR]');
+    debugPrint('Body: ${_formatJsonForLog({'error': error.toString()})}');
+  }
+
+  String _formatJsonForLog(Object? value) {
+    try {
+      final dynamic jsonValue;
+      if (value == null) {
+        jsonValue = <String, dynamic>{};
+      } else if (value is String) {
+        jsonValue = value.trim().isEmpty
+            ? <String, dynamic>{}
+            : jsonDecode(value);
+      } else {
+        jsonValue = value;
+      }
+      return const JsonEncoder.withIndent('  ').convert(jsonValue);
+    } catch (_) {
+      return value?.toString() ?? '';
     }
   }
 }
@@ -371,5 +465,3 @@ class _PendingRequest {
   final http.Request request;
   final Completer<http.Response> completer;
 }
-
-

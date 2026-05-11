@@ -54,6 +54,10 @@ class OrderService extends GetxService {
   Future<OrderDetailModel> fetchOrderDetail(String orderId) async {
     final response = await _apiProvider.get(
       '${ApiEndpoints.orderDetail}/$orderId',
+      queryParameters: const <String, dynamic>{
+        'itemPage': 1,
+        'itemPageSize': 1000,
+      },
     );
     _ensureOrderResponseOk(
       response,
@@ -93,26 +97,36 @@ class OrderService extends GetxService {
   }) {
     return _apiProvider.post(
       ApiEndpoints.orderStore,
-      data: <String, dynamic>{
-        'uuid': uuid,
-        'entry_no': entryNo,
-        'entry_date': entryDate,
-        'party_name': partyName,
-        'party_mobile': partyMobile,
-        'total_qty': items
-            .fold<int>(0, (sum, item) => sum + item.quantity)
-            .toString(),
-        'items': items
-            .map(
-              (item) => <String, dynamic>{
-                'id': 0,
-                'item_code': item.itemCode,
-                'item_name': item.itemName,
-                'qty': item.quantity,
-              },
-            )
-            .toList(),
-      },
+      data: _orderPayload(
+        uuid: uuid,
+        entryNo: entryNo,
+        entryDate: entryDate,
+        partyName: partyName,
+        partyMobile: partyMobile,
+        items: items,
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> updateOrder({
+    required String orderId,
+    required String uuid,
+    required int entryNo,
+    required String entryDate,
+    required String partyName,
+    required String partyMobile,
+    required List<DraftOrderItem> items,
+  }) {
+    return _apiProvider.post(
+      ApiEndpoints.orderStoreById(orderId),
+      data: _orderPayload(
+        uuid: uuid,
+        entryNo: entryNo,
+        entryDate: entryDate,
+        partyName: partyName,
+        partyMobile: partyMobile,
+        items: items,
+      ),
     );
   }
 
@@ -143,6 +157,36 @@ class OrderService extends GetxService {
             response['response_message'] ??
             '')
         .toString();
+  }
+
+  Map<String, dynamic> _orderPayload({
+    required String uuid,
+    required int entryNo,
+    required String entryDate,
+    required String partyName,
+    required String partyMobile,
+    required List<DraftOrderItem> items,
+  }) {
+    return <String, dynamic>{
+      'uuid': uuid,
+      'entry_no': entryNo,
+      'entry_date': entryDate,
+      'party_name': partyName,
+      'party_mobile': partyMobile,
+      'total_qty': items
+          .fold<int>(0, (sum, item) => sum + item.quantity)
+          .toString(),
+      'items': items
+          .map(
+            (item) => <String, dynamic>{
+              'id': item.id.isEmpty ? 0 : item.id,
+              'item_code': item.itemCode,
+              'item_name': item.itemName,
+              'qty': item.quantity,
+            },
+          )
+          .toList(),
+    };
   }
 
   Map<String, dynamic> _dataMap(Map<String, dynamic> response) {

@@ -1,11 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/permission_service.dart';
 import '../../data/models/order_models.dart';
+import '../../routes/app_routes.dart';
+import '../home/fallback_network_image.dart';
 import 'order_create_controller.dart';
 
 class OrderCreateView extends GetView<OrderCreateController> {
@@ -13,19 +14,25 @@ class OrderCreateView extends GetView<OrderCreateController> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
       backgroundColor: AppColors.scaffold,
-      appBar: AppBar(title: const Text('Create Order')),
+      appBar: AppBar(title: Text(controller.screenTitle)),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Obx(
           () => Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: _SubmitBar(
-              lineCount: controller.selectedItems.length,
+              lineCount: controller.lineCount,
               totalQuantity: controller.totalQuantity,
+              totalAmount: controller.totalAmount,
               isPreparing: controller.isPreparing.value,
               isSubmitting: controller.isSubmitting.value,
+              submitLabel: controller.submitLabel,
+              submittingLabel: controller.submittingLabel,
+              preparingLabel: controller.preparingLabel,
               onSubmit:
                   controller.isPreparing.value || controller.isSubmitting.value
                   ? null
@@ -35,325 +42,1023 @@ class OrderCreateView extends GetView<OrderCreateController> {
         ),
       ),
       body: SafeArea(
-        child: Obx(() {
-          final selectedCount = controller.selectedItems.length;
+        child: Form(
+          key: controller.formKey,
+          child: Obx(() {
+            final items = controller.cartItems.toList();
+            final selectedCategory = controller.selectedPriceCategory.value;
 
-          return Form(
-            key: controller.formKey,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
+            return ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                bottomInset > 0 ? bottomInset + 150 : 150,
+              ),
               children: [
-                _OrderHeroCard(
+                _OrderCartHero(
+                  title: controller.heroTitle,
                   entryNo: controller.nextEntryNo.value,
                   entryDate: controller.displayEntryDate,
-                  lineCount: selectedCount,
+                  lineCount: controller.lineCount,
                   totalQuantity: controller.totalQuantity,
-                  isPreparing: controller.isPreparing.value,
+                  totalAmount: controller.totalAmount,
                 ),
                 const SizedBox(height: 16),
-                _CreateSection(
-                  icon: Icons.person_pin_circle_outlined,
-                  title: 'Party Details',
-                  subtitle: 'These values are sent to the remote order API.',
-                  badge: 'Required',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextFormField(
-                        controller: controller.partyNameController,
-                        decoration: buildSoftInputDecoration(
-                          labelText: 'Party Name',
-                          hintText: 'Enter party name',
-                          prefixIcon: const Icon(Icons.person_outline),
-                        ),
-                        validator: (value) {
-                          if ((value ?? '').trim().isEmpty) {
-                            return 'Party name is required';
-                          }
-                          return null;
-                        },
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: controller.partyMobileController,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: controller.mobileFormatters,
-                        decoration: buildSoftInputDecoration(
-                          labelText: 'Mobile No',
-                          hintText: 'Enter mobile no',
-                          prefixIcon: const Icon(Icons.phone_outlined),
-                        ),
-                        validator: (value) {
-                          final digits = (value ?? '').trim();
-                          if (digits.isEmpty) {
-                            return 'Mobile no is required';
-                          }
-                          if (digits.length < 10) {
-                            return 'Enter a valid mobile no';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
+                _PartyCard(controller: controller),
+                const SizedBox(height: 16),
+                _PriceSelector(
+                  categories: controller.priceCategories,
+                  selectedCategory: selectedCategory,
+                  onSelected: controller.selectPriceCategory,
+                ),
+                _LookupCard(
+                  isLoading: controller.isLookingUpItem.value,
+                  onTap: () => _openLookupSheet(context),
                 ),
                 const SizedBox(height: 16),
-                _CreateSection(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Order Items',
-                  subtitle:
-                      'Search items from ${ApiEndpoints.ahmLabel} and ${ApiEndpoints.bhuLabel}, then add them to the order. You can edit or remove items before submitting.',
-                  badge: selectedCount == 0
-                      ? 'Pending'
-                      : '$selectedCount added',
-                  action: ElevatedButton.icon(
-                    onPressed:
-                        controller.isPreparing.value ||
-                            controller.isSubmitting.value
-                        ? null
-                        : () => _openItemPicker(context),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Item'),
+                if (controller.isHydratingOrderItems.value) ...[
+                  const _InlineBanner(
+                    icon: Icons.sync_outlined,
+                    message: 'Loading live item details, prices, and images...',
+                    color: AppColors.primary,
+                    backgroundColor: Color(0xFFEFF3FF),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _SummaryChip(
-                            icon: Icons.list_alt_outlined,
-                            label: '$selectedCount line(s)',
-                          ),
-                          _SummaryChip(
-                            icon: Icons.inventory_2_outlined,
-                            label: '${controller.totalQuantity} total qty',
-                            emphasized: selectedCount > 0,
-                          ),
-                          if (controller.syncWarnings.isNotEmpty)
-                            _SummaryChip(
-                              icon: Icons.sync_problem_outlined,
-                              label:
-                                  '${controller.syncWarnings.length} sync alert(s)',
-                            ),
-                        ],
-                      ),
-                      if (controller.syncWarnings.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        for (final warning in controller.syncWarnings)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _WarningBanner(message: warning),
-                          ),
-                      ],
-                      const SizedBox(height: 16),
-                      if (controller.selectedItems.isEmpty)
-                        const _OrderCreateEmptyState(
-                          icon: Icons.search_outlined,
-                          title: 'No items added yet',
-                          subtitle:
-                              'Tap "Add Item" to search both item servers and pick stock.',
-                        )
-                      else
-                        for (final item in controller.selectedItems) ...[
-                          _SelectedItemCard(
-                            item: item,
-                            onEdit: () => _editItem(context, item),
-                            onRemove: () => controller.removeItem(item),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                    ],
+                  const SizedBox(height: 12),
+                ],
+                if (controller.syncWarnings.isNotEmpty) ...[
+                  for (final warning in controller.syncWarnings) ...[
+                    _InlineBanner(
+                      icon: Icons.info_outline,
+                      message: warning,
+                      color: Colors.orange.shade800,
+                      backgroundColor: Colors.orange.shade50,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  const SizedBox(height: 4),
+                ],
+                if (items.isEmpty)
+                  const _EmptyCartCard()
+                else ...[
+                  for (final item in items) ...[
+                    _OrderCartItemCard(
+                      item: item,
+                      selectedPrice: controller.selectedPriceForCartItem(item),
+                      onDecrease: item.quantity > 1
+                          ? () => controller.updateCartItemQuantity(
+                              item,
+                              item.quantity - 1,
+                            )
+                          : null,
+                      onIncrease: item.quantity < item.availableQuantity
+                          ? () => controller.updateCartItemQuantity(
+                              item,
+                              item.quantity + 1,
+                            )
+                          : null,
+                      onQuantityChanged: (quantity) =>
+                          controller.updateCartItemQuantity(item, quantity),
+                      onRemove: () => controller.removeCartItem(item),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  _TotalsCard(
+                    lineCount: controller.lineCount,
+                    totalQuantity: controller.totalQuantity,
+                    totalAmount: controller.totalAmount,
                   ),
-                ),
+                ],
               ],
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
 
-  Future<void> _openItemPicker(BuildContext context) async {
-    final item = await showModalBottomSheet<MergedItemModel>(
+  Future<void> _openLookupSheet(BuildContext context) async {
+    final lookup = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.92,
-        child: _ItemPickerSheet(controller: controller),
-      ),
+      builder: (_) => const _OrderLookupSheet(),
     );
 
-    if (item == null || !context.mounted) {
+    if (lookup == null || lookup.trim().isEmpty) {
       return;
     }
-    await _showQuantityDialog(context, item);
-  }
-
-  Future<void> _editItem(BuildContext context, DraftOrderItem item) async {
-    final merged = MergedItemModel(
-      itemCode: item.itemCode,
-      itemName: item.itemName,
-      totalQuantity: item.availableQuantity,
-      serverQuantities: const <String, int>{},
-      qrCode: null,
-    );
-
-    await _showQuantityDialog(context, merged, editing: item);
-  }
-
-  Future<void> _showQuantityDialog(
-    BuildContext context,
-    MergedItemModel item, {
-    DraftOrderItem? editing,
-  }) async {
-    final maxAllowed = controller.maxAllowedFor(item, editing: editing);
-    if (maxAllowed <= 0) {
-      Get.snackbar(
-        '',
-        'No more stock is available for this item.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
-      return;
-    }
-
-    final quantity = await showDialog<int>(
-      context: context,
-      builder: (_) => _QuantityDialog(
-        item: item,
-        maxAllowed: maxAllowed,
-        initialQuantity: editing?.quantity ?? 1,
-        isEditing: editing != null,
-      ),
-    );
-
-    if (quantity == null) {
-      return;
-    }
-    controller.upsertItem(item, quantity, editing: editing);
+    await controller.addItemByLookup(lookup);
   }
 }
 
-class _QuantityDialog extends StatefulWidget {
-  const _QuantityDialog({
-    required this.item,
-    required this.maxAllowed,
-    required this.initialQuantity,
-    required this.isEditing,
+class _OrderCartHero extends StatelessWidget {
+  const _OrderCartHero({
+    required this.title,
+    required this.entryNo,
+    required this.entryDate,
+    required this.lineCount,
+    required this.totalQuantity,
+    required this.totalAmount,
   });
 
-  final MergedItemModel item;
-  final int maxAllowed;
-  final int initialQuantity;
-  final bool isEditing;
+  final String title;
+  final int entryNo;
+  final String entryDate;
+  final int lineCount;
+  final int totalQuantity;
+  final double totalAmount;
 
   @override
-  State<_QuantityDialog> createState() => _QuantityDialogState();
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Order #${entryNo <= 0 ? '-' : entryNo} • $entryDate',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _HeroChip(
+                icon: Icons.list_alt_outlined,
+                label: '$lineCount line(s)',
+              ),
+              _HeroChip(
+                icon: Icons.inventory_2_outlined,
+                label: '$totalQuantity qty',
+              ),
+              _HeroChip(
+                icon: Icons.payments_outlined,
+                label: _formatAmount(totalAmount),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _QuantityDialogState extends State<_QuantityDialog> {
-  late final TextEditingController _qtyController;
-  String? _errorText;
+class _HeroChip extends StatelessWidget {
+  const _HeroChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PartyCard extends StatelessWidget {
+  const _PartyCard({required this.controller});
+
+  final OrderCreateController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Party Details',
+      subtitle: 'Customer name and mobile number are required before saving.',
+      child: Column(
+        children: [
+          TextFormField(
+            controller: controller.partyNameController,
+            textInputAction: TextInputAction.next,
+            scrollPadding: const EdgeInsets.only(bottom: 180),
+            decoration: _softInputDecoration(
+              labelText: 'Party Name',
+              hintText: 'Enter party name',
+              prefixIcon: const Icon(Icons.person_outline),
+            ),
+            validator: (value) =>
+                (value ?? '').trim().isEmpty ? 'Party name is required' : null,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: controller.partyMobileController,
+            keyboardType: TextInputType.phone,
+            inputFormatters: controller.mobileFormatters,
+            textInputAction: TextInputAction.done,
+            scrollPadding: const EdgeInsets.only(bottom: 180),
+            decoration: _softInputDecoration(
+              labelText: 'Mobile No',
+              hintText: 'Enter mobile no',
+              prefixIcon: const Icon(Icons.phone_outlined),
+            ),
+            validator: (value) {
+              final digits = (value ?? '').trim();
+              if (digits.isEmpty) {
+                return 'Mobile no is required';
+              }
+              if (digits.length < 10) {
+                return 'Enter a valid mobile no';
+              }
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceSelector extends StatelessWidget {
+  const _PriceSelector({
+    required this.categories,
+    required this.selectedCategory,
+    required this.onSelected,
+  });
+
+  final List<PriceCategoryModel> categories;
+  final PriceCategoryModel? selectedCategory;
+  final ValueChanged<PriceCategoryModel> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _SectionCard(
+        title: 'Price',
+        subtitle: 'Selected price is used for cart amount preview.',
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: categories
+                .map(
+                  (category) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category.displayName),
+                      selected:
+                          selectedCategory?.categoryNo == category.categoryNo,
+                      onSelected: (_) => onSelected(category),
+                      selectedColor: AppColors.primary,
+                      backgroundColor: const Color(0xFFF6F6F6),
+                      labelStyle: TextStyle(
+                        color:
+                            selectedCategory?.categoryNo == category.categoryNo
+                            ? Colors.white
+                            : AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      side: BorderSide(
+                        color:
+                            selectedCategory?.categoryNo == category.categoryNo
+                            ? AppColors.primary
+                            : Colors.black12,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LookupCard extends StatelessWidget {
+  const _LookupCard({required this.isLoading, required this.onTap});
+
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Add Item',
+      subtitle: 'Scan QR or enter an item code to add more lines.',
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: isLoading ? null : onTap,
+          icon: isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.qr_code_scanner_outlined),
+          label: Text(isLoading ? 'Searching...' : 'Scan QR / Add Item'),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderCartItemCard extends StatelessWidget {
+  const _OrderCartItemCard({
+    required this.item,
+    required this.selectedPrice,
+    required this.onDecrease,
+    required this.onIncrease,
+    required this.onQuantityChanged,
+    required this.onRemove,
+  });
+
+  final CartItemModel item;
+  final ItemPriceModel selectedPrice;
+  final VoidCallback? onDecrease;
+  final VoidCallback? onIncrease;
+  final ValueChanged<int> onQuantityChanged;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasOpenLimit = item.availableQuantity >= 999999;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 62,
+                  height: 62,
+                  color: AppColors.primary.withValues(alpha: 0.06),
+                  child: FallbackNetworkImage(
+                    imageUrls: [
+                      ...item.imageUrls,
+                      if ((item.imageUrl ?? '').isNotEmpty) item.imageUrl!,
+                    ],
+                    iconColor: AppColors.primary,
+                    iconSize: 24,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.itemName.isEmpty ? 'No item name' : item.itemName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Code ${item.itemCode.isEmpty ? '-' : item.itemCode} • ${selectedPrice.displayName}',
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Price ${_formatAmount(selectedPrice.finalPrice)} • ${hasOpenLimit ? 'Editable qty' : 'Available ${item.availableQuantity}'}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _QtyIconButton(icon: Icons.remove, onTap: onDecrease),
+              SizedBox(
+                width: 86,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: _OrderCartQuantityInput(
+                    quantity: item.quantity,
+                    maxQuantity: item.availableQuantity,
+                    onChanged: onQuantityChanged,
+                  ),
+                ),
+              ),
+              _QtyIconButton(icon: Icons.add, onTap: onIncrease),
+              const Spacer(),
+              Text(
+                _formatAmount(selectedPrice.finalPrice * item.quantity),
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderCartQuantityInput extends StatefulWidget {
+  const _OrderCartQuantityInput({
+    required this.quantity,
+    required this.maxQuantity,
+    required this.onChanged,
+  });
+
+  final int quantity;
+  final int maxQuantity;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_OrderCartQuantityInput> createState() =>
+      _OrderCartQuantityInputState();
+}
+
+class _OrderCartQuantityInputState extends State<_OrderCartQuantityInput> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _qtyController = TextEditingController(
-      text: widget.initialQuantity.toString(),
-    );
+    _controller = TextEditingController(text: widget.quantity.toString());
+    _focusNode = FocusNode()..addListener(_handleFocusChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _OrderCartQuantityInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final visibleQuantity = int.tryParse(_controller.text.trim());
+    if (widget.quantity != oldWidget.quantity &&
+        (!_focusNode.hasFocus || visibleQuantity != widget.quantity)) {
+      _setText(widget.quantity.toString());
+    }
   }
 
   @override
   void dispose() {
-    _qtyController.dispose();
+    _focusNode.removeListener(_handleFocusChanged);
+    _focusNode.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _submit() {
-    final quantity = int.tryParse(_qtyController.text.trim()) ?? 0;
-    if (quantity <= 0 || quantity > widget.maxAllowed) {
-      setState(() {
-        _errorText = 'Enter a value between 1 and ${widget.maxAllowed}';
-      });
+  void _handleFocusChanged() {
+    if (!_focusNode.hasFocus) {
+      _commitQuantity();
+    }
+  }
+
+  void _setText(String text) {
+    _controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
+  void _commitQuantity() {
+    final parsed = int.tryParse(_controller.text.trim());
+    if (parsed == null) {
+      _setText(widget.quantity.toString());
       return;
     }
-    Navigator.of(context).pop(quantity);
+    _applyQuantity(parsed);
+  }
+
+  void _applyQuantity(int parsed) {
+    final maxQuantity = widget.maxQuantity <= 0 ? 999999 : widget.maxQuantity;
+    final clamped = parsed.clamp(1, maxQuantity).toInt();
+    _setText(clamped.toString());
+    if (clamped != widget.quantity) {
+      widget.onChanged(clamped);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final item = widget.item;
+    return TextField(
+      controller: _controller,
+      focusNode: _focusNode,
+      textAlign: TextAlign.center,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      onChanged: (value) {
+        final parsed = int.tryParse(value.trim());
+        if (parsed != null) {
+          _applyQuantity(parsed);
+        }
+      },
+      onSubmitted: (_) => _commitQuantity(),
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: AppColors.primary,
+      ),
+    );
+  }
+}
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      title: Text(item.itemName.isEmpty ? item.itemCode : item.itemName),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Item code: ${item.itemCode.isEmpty ? '-' : item.itemCode}',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Available total quantity: ${item.totalQuantity}',
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'You can enter up to ${widget.maxAllowed} for this order.',
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _qtyController,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              onSubmitted: (_) => _submit(),
-              decoration: buildSoftInputDecoration(
-                labelText: 'Quantity',
-                hintText: 'Enter quantity',
-                errorText: _errorText,
-                prefixIcon: const Icon(Icons.format_list_numbered),
-              ),
-            ),
-          ],
+class _QtyIconButton extends StatelessWidget {
+  const _QtyIconButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: onTap == null
+              ? Colors.grey.shade200
+              : AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onTap == null ? Colors.grey : AppColors.primary,
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+    );
+  }
+}
+
+class _TotalsCard extends StatelessWidget {
+  const _TotalsCard({
+    required this.lineCount,
+    required this.totalQuantity,
+    required this.totalAmount,
+  });
+
+  final int lineCount;
+  final int totalQuantity;
+  final double totalAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        children: [
+          _CartTotalRow(label: 'Items', value: '$lineCount'),
+          const SizedBox(height: 10),
+          _CartTotalRow(label: 'Total Qty', value: '$totalQuantity'),
+          const SizedBox(height: 10),
+          _CartTotalRow(
+            label: 'Amount',
+            value: _formatAmount(totalAmount),
+            emphasized: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartTotalRow extends StatelessWidget {
+  const _CartTotalRow({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(label, style: TextStyle(color: Colors.grey.shade700)),
         ),
-        ElevatedButton(
-          onPressed: _submit,
-          child: Text(widget.isEditing ? 'Update' : 'Add'),
+        Text(
+          value,
+          style: TextStyle(
+            color: AppColors.primary,
+            fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
+            fontSize: emphasized ? 18 : 15,
+          ),
         ),
       ],
     );
   }
 }
 
-InputDecoration buildSoftInputDecoration({
+class _SubmitBar extends StatelessWidget {
+  const _SubmitBar({
+    required this.lineCount,
+    required this.totalQuantity,
+    required this.totalAmount,
+    required this.isPreparing,
+    required this.isSubmitting,
+    required this.submitLabel,
+    required this.submittingLabel,
+    required this.preparingLabel,
+    required this.onSubmit,
+  });
+
+  final int lineCount;
+  final int totalQuantity;
+  final double totalAmount;
+  final bool isPreparing;
+  final bool isSubmitting;
+  final String submitLabel;
+  final String submittingLabel;
+  final String preparingLabel;
+  final VoidCallback? onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.black12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$lineCount item(s) • $totalQuantity qty',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatAmount(totalAmount),
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: onSubmit,
+            child: isPreparing || isSubmitting
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(isPreparing ? preparingLabel : submittingLabel),
+                    ],
+                  )
+                : Text(submitLabel),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(subtitle, style: TextStyle(color: Colors.grey.shade700)),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyCartCard extends StatelessWidget {
+  const _EmptyCartCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.shopping_cart_outlined, color: Colors.grey.shade400, size: 40),
+          const SizedBox(height: 10),
+          const Text(
+            'No items added',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tap "Scan QR / Add Item" to add lines before saving.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineBanner extends StatelessWidget {
+  const _InlineBanner({
+    required this.icon,
+    required this.message,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final IconData icon;
+  final String message;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderLookupSheet extends StatefulWidget {
+  const _OrderLookupSheet();
+
+  @override
+  State<_OrderLookupSheet> createState() => _OrderLookupSheetState();
+}
+
+class _OrderLookupSheetState extends State<_OrderLookupSheet> {
+  late final TextEditingController inputController;
+
+  @override
+  void initState() {
+    super.initState();
+    inputController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    inputController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _scanWithCamera() async {
+    final ok = await PermissionService.instance.ensureCameraPermission();
+    if (!ok) {
+      Get.snackbar(
+        '',
+        'Camera permission is required to scan QR code.',
+        snackPosition: SnackPosition.TOP,
+      );
+      return;
+    }
+
+    final value = await Get.toNamed(Routes.scanner);
+    if (!mounted || value is! String || value.trim().isEmpty) {
+      return;
+    }
+    Navigator.of(context).pop(_normalizeLookupValue(value));
+  }
+
+  void _submitManual() {
+    final value = _normalizeLookupValue(inputController.text);
+    if (value.isEmpty) {
+      return;
+    }
+    Navigator.of(context).pop(value);
+  }
+
+  String _normalizeLookupValue(String value) {
+    return value.replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), '').trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Scan QR or Enter Code',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Use camera scan or type item code manually.',
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _scanWithCamera,
+                  icon: const Icon(Icons.qr_code_scanner_outlined),
+                  label: const Text('Scan With Camera'),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: inputController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _submitManual(),
+                decoration: _softInputDecoration(
+                  labelText: 'QR Code / Item Code',
+                  hintText: 'Enter QR or item code',
+                  prefixIcon: const Icon(Icons.qr_code_2_outlined),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _submitManual,
+                  icon: const Icon(Icons.search),
+                  label: const Text('Search Item'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _softInputDecoration({
   required String labelText,
   required String hintText,
   Widget? prefixIcon,
-  Widget? suffixIcon,
-  String? errorText,
 }) {
   OutlineInputBorder border(Color color, [double width = 1]) {
     return OutlineInputBorder(
@@ -366,8 +1071,6 @@ InputDecoration buildSoftInputDecoration({
     labelText: labelText,
     hintText: hintText,
     prefixIcon: prefixIcon,
-    suffixIcon: suffixIcon,
-    errorText: errorText,
     filled: true,
     fillColor: const Color(0xFFF8F8F8),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -379,1301 +1082,9 @@ InputDecoration buildSoftInputDecoration({
   );
 }
 
-class _CreateSection extends StatelessWidget {
-  const _CreateSection({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-    required this.icon,
-    this.action,
-    this.badge,
-  });
-
-  final String title;
-  final String subtitle;
-  final Widget child;
-  final IconData icon;
-  final Widget? action;
-  final String? badge;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final useStackedHeader = action != null && constraints.maxWidth < 560;
-
-          Widget buildHeader() {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(icon, color: AppColors.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                          if (badge != null) ...[
-                            const SizedBox(width: 8),
-                            _HeaderBadge(label: badge!),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (useStackedHeader) ...[
-                buildHeader(),
-                const SizedBox(height: 12),
-                Align(alignment: Alignment.centerLeft, child: action),
-              ] else
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: buildHeader()),
-                    if (action != null) ...[const SizedBox(width: 12), action!],
-                  ],
-                ),
-              const SizedBox(height: 16),
-              child,
-            ],
-          );
-        },
-      ),
-    );
+String _formatAmount(double value) {
+  if (value == value.roundToDouble()) {
+    return value.toStringAsFixed(0);
   }
-}
-
-class _HeaderBadge extends StatelessWidget {
-  const _HeaderBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryChip extends StatelessWidget {
-  const _SummaryChip({
-    required this.icon,
-    required this.label,
-    this.emphasized = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: emphasized
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: emphasized
-              ? AppColors.primary.withValues(alpha: 0.14)
-              : Colors.black12,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppColors.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OrderHeroCard extends StatelessWidget {
-  const _OrderHeroCard({
-    required this.entryNo,
-    required this.entryDate,
-    required this.lineCount,
-    required this.totalQuantity,
-    required this.isPreparing,
-  });
-
-  final int entryNo;
-  final String entryDate;
-  final int lineCount;
-  final int totalQuantity;
-  final bool isPreparing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF111111), Color(0xFF2B2B2B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Order Draft',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.74),
-                        letterSpacing: 0.4,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      isPreparing ? 'Preparing entry no...' : 'Entry #$entryNo',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_outlined,
-                      size: 15,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      entryDate,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _HeroStat(label: 'Line Items', value: '$lineCount'),
-              _HeroStat(label: 'Total Qty', value: '$totalQuantity'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroStat extends StatelessWidget {
-  const _HeroStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 120),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubmitBar extends StatelessWidget {
-  const _SubmitBar({
-    required this.lineCount,
-    required this.totalQuantity,
-    required this.isPreparing,
-    required this.isSubmitting,
-    required this.onSubmit,
-  });
-
-  final int lineCount;
-  final int totalQuantity;
-  final bool isPreparing;
-  final bool isSubmitting;
-  final VoidCallback? onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _SubmitMetric(label: 'Lines', value: '$lineCount'),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SubmitMetric(label: 'Qty', value: '$totalQuantity'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onSubmit,
-              icon: isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.cloud_upload_outlined),
-              label: Text(
-                isSubmitting
-                    ? 'Submitting...'
-                    : isPreparing
-                    ? 'Preparing Order...'
-                    : 'Create Order',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubmitMetric extends StatelessWidget {
-  const _SubmitMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SelectedItemCard extends StatelessWidget {
-  const _SelectedItemCard({
-    required this.item,
-    required this.onEdit,
-    required this.onRemove,
-  });
-
-  final DraftOrderItem item;
-  final VoidCallback onEdit;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.inventory_2_outlined,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.itemName.isEmpty ? item.itemCode : item.itemName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.itemCode.isEmpty
-                          ? 'Item code unavailable'
-                          : 'Code: ${item.itemCode}',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Qty',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${item.quantity}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _ItemTag(
-                icon: Icons.inventory_2_outlined,
-                label: 'Available ${item.availableQuantity}',
-              ),
-              _ItemTag(
-                icon: Icons.shopping_basket_outlined,
-                label: 'Selected ${item.quantity}',
-                emphasized: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit Qty'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: onRemove,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Remove'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red.shade700,
-                    backgroundColor: Colors.red.shade50,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ItemTag extends StatelessWidget {
-  const _ItemTag({
-    required this.icon,
-    required this.label,
-    this.emphasized = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: emphasized
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: AppColors.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WarningBanner extends StatelessWidget {
-  const _WarningBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF4E5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1D39A)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: Color(0xFF9C6200)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: Color(0xFF9C6200),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OrderCreateEmptyState extends StatelessWidget {
-  const _OrderCreateEmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 30),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
-      ],
-    );
-  }
-}
-
-class _ItemPickerSheet extends StatefulWidget {
-  const _ItemPickerSheet({required this.controller});
-
-  final OrderCreateController controller;
-
-  @override
-  State<_ItemPickerSheet> createState() => _ItemPickerSheetState();
-}
-
-class _ItemPickerSheetState extends State<_ItemPickerSheet> {
-  static const int _pageSize = 20;
-  final TextEditingController _searchController = TextEditingController();
-  Timer? _searchDebounce;
-
-  List<MergedItemModel> _items = <MergedItemModel>[];
-  List<MergedItemModel> _cachedItems = <MergedItemModel>[];
-  List<String> _warnings = <String>[];
-  bool _isLoading = false;
-  bool _hasMore = false;
-  int _nextPage = 1;
-  int _nextLocalPage = 1;
-  String? _errorMessage;
-  bool _isShowingLocalResults = false;
-  String? _pendingRemoteQuery;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(_onSearchChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadRemote(reset: true, query: '');
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged() {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      if (!mounted) {
-        return;
-      }
-      _applySearchStrategy(_searchController.text.trim());
-    });
-  }
-
-  void _applySearchStrategy(String query) {
-    final localPage = widget.controller.filterLoadedItems(
-      items: _cachedItems,
-      page: 1,
-      pageSize: _pageSize,
-      query: query,
-      warnings: _warnings,
-    );
-
-    if (localPage.items.isNotEmpty ||
-        (query.isEmpty && _cachedItems.isNotEmpty)) {
-      _applyLocalResults(page: 1, query: query);
-      return;
-    }
-
-    _loadRemote(reset: true, query: query);
-  }
-
-  void _applyLocalResults({
-    required int page,
-    required String query,
-    bool append = false,
-  }) {
-    final result = widget.controller.filterLoadedItems(
-      items: _cachedItems,
-      page: page,
-      pageSize: _pageSize,
-      query: query,
-      warnings: _warnings,
-    );
-
-    setState(() {
-      _isShowingLocalResults = true;
-      _errorMessage = null;
-      _warnings = <String>[];
-      _items = append
-          ? <MergedItemModel>[..._items, ...result.items]
-          : result.items;
-      _hasMore = result.hasMore;
-      _nextLocalPage = page + 1;
-    });
-    widget.controller.syncWarnings.clear();
-  }
-
-  void _mergeFetchedItemsIntoCache(List<MergedItemModel> incoming) {
-    final mergedCache = <String, MergedItemModel>{
-      for (final item in _cachedItems) item.key: item,
-    };
-
-    for (final item in incoming) {
-      final existing = mergedCache[item.key];
-      if (existing == null) {
-        mergedCache[item.key] = item;
-        continue;
-      }
-
-      final mergedServerQuantities = <String, int>{
-        ...existing.serverQuantities,
-        ...item.serverQuantities,
-      };
-
-      mergedCache[item.key] = MergedItemModel(
-        itemCode: item.itemCode.isNotEmpty ? item.itemCode : existing.itemCode,
-        itemName: item.itemName.isNotEmpty ? item.itemName : existing.itemName,
-        totalQuantity: mergedServerQuantities.values.fold<int>(
-          0,
-          (sum, quantity) => sum + quantity,
-        ),
-        serverQuantities: mergedServerQuantities,
-        qrCode: (item.qrCode?.trim().isNotEmpty ?? false)
-            ? item.qrCode
-            : existing.qrCode,
-      );
-    }
-
-    _cachedItems = mergedCache.values.toList()
-      ..sort((a, b) {
-        final codeCompare = a.itemCode.compareTo(b.itemCode);
-        if (codeCompare != 0) {
-          return codeCompare;
-        }
-        return a.itemName.compareTo(b.itemName);
-      });
-  }
-
-  Future<void> _load({required bool reset}) async {
-    if (_isShowingLocalResults) {
-      if (!reset && !_hasMore) {
-        return;
-      }
-
-      _applyLocalResults(
-        page: reset ? 1 : _nextLocalPage,
-        query: _searchController.text.trim(),
-        append: !reset,
-      );
-      return;
-    }
-
-    await _loadRemote(reset: reset, query: _searchController.text.trim());
-  }
-
-  Future<void> _loadRemote({required bool reset, required String query}) async {
-    if (_isLoading) {
-      _pendingRemoteQuery = query.trim();
-      return;
-    }
-
-    final requestQuery = query.trim();
-    _pendingRemoteQuery = null;
-
-    setState(() {
-      _isLoading = true;
-      if (reset) {
-        _errorMessage = null;
-        _nextPage = 1;
-        _isShowingLocalResults = false;
-      }
-    });
-
-    try {
-      final pageToLoad = reset ? 1 : _nextPage;
-      final result = await widget.controller.searchItems(
-        page: pageToLoad,
-        pageSize: _pageSize,
-        query: requestQuery,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      _mergeFetchedItemsIntoCache(result.items);
-
-      final latestQuery = _searchController.text.trim();
-      if (latestQuery != requestQuery) {
-        _pendingRemoteQuery = latestQuery;
-        return;
-      }
-
-      setState(() {
-        _warnings = result.items.isEmpty ? result.warnings : <String>[];
-        _hasMore = result.hasMore;
-        _isShowingLocalResults = false;
-        _items = reset
-            ? result.items
-            : <MergedItemModel>[..._items, ...result.items];
-        _nextPage = pageToLoad + 1;
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorMessage =
-            'Unable to load items right now. Check the dashboard status and try again.';
-        _hasMore = false;
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-
-      final queuedQuery = _pendingRemoteQuery;
-      if (mounted && queuedQuery != null) {
-        _pendingRemoteQuery = null;
-        Future<void>.microtask(() => _applySearchStrategy(queuedQuery));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 48,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.black12,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Search Items',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'Search by item code or name and pick merged stock from ${ApiEndpoints.ahmLabel} and ${ApiEndpoints.bhuLabel}.',
-                    style: TextStyle(color: Colors.grey.shade600, height: 1.35),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _SummaryChip(
-                        icon: Icons.inventory_outlined,
-                        label: '${_items.length} result(s)',
-                      ),
-                      const _SummaryChip(
-                        icon: Icons.dns_outlined,
-                        label:
-                            '${ApiEndpoints.ahmLabel} + ${ApiEndpoints.bhuLabel}',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: TextField(
-                controller: _searchController,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) =>
-                    _applySearchStrategy(_searchController.text.trim()),
-                decoration: buildSoftInputDecoration(
-                  labelText: 'Item code or item name',
-                  hintText:
-                      'Search from ${ApiEndpoints.ahmLabel} and ${ApiEndpoints.bhuLabel}',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      _searchController.clear();
-                      _applySearchStrategy('');
-                    },
-                    icon: const Icon(Icons.clear),
-                    tooltip: 'Clear',
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading
-                          ? null
-                          : () => _loadRemote(
-                              reset: true,
-                              query: _searchController.text.trim(),
-                            ),
-                      icon: const Icon(Icons.search),
-                      label: const Text('Search Servers'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_warnings.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    for (final warning in _warnings) ...[
-                      _WarningBanner(message: warning),
-                      const SizedBox(height: 8),
-                    ],
-                  ],
-                ),
-              ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: _isLoading && _items.isEmpty
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
-                    )
-                  : _errorMessage != null && _items.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.cloud_off_outlined,
-                              size: 42,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _errorMessage!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: () => _load(reset: true),
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : _items.isEmpty
-                  ? _OrderCreateEmptyState(
-                      icon: _warnings.isNotEmpty
-                          ? Icons.cloud_off_outlined
-                          : Icons.inventory_2_outlined,
-                      title: _warnings.isNotEmpty
-                          ? 'Item servers unavailable'
-                          : 'No items matched',
-                      subtitle: _warnings.isNotEmpty
-                          ? 'Check the dashboard status. If either ${ApiEndpoints.ahmLabel} or ${ApiEndpoints.bhuLabel} is running, search will continue to work.'
-                          : 'Try a different code or name to search ${ApiEndpoints.ahmLabel} and ${ApiEndpoints.bhuLabel}.',
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                      itemCount: _items.length + (_hasMore ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index >= _items.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: OutlinedButton.icon(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => _load(reset: false),
-                              icon: const Icon(Icons.expand_more),
-                              label: Text(
-                                _isLoading ? 'Loading...' : 'Load More',
-                              ),
-                            ),
-                          );
-                        }
-
-                        final item = _items[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Material(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(22),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(22),
-                              onTap: () => Navigator.of(context).pop(item),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          width: 44,
-                                          height: 44,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                          ),
-                                          child: const Icon(
-                                            Icons.inventory_2_outlined,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                item.itemName.isEmpty
-                                                    ? item.itemCode
-                                                    : item.itemName,
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: AppColors.primary,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                item.itemCode.isEmpty
-                                                    ? 'Item code unavailable'
-                                                    : 'Code: ${item.itemCode}',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 10,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary,
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            children: [
-                                              const Text(
-                                                'Total',
-                                                style: TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              Text(
-                                                '${item.totalQuantity}',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w800,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: [
-                                        const _ItemTag(
-                                          icon: Icons.sync_alt_outlined,
-                                          label: 'Merged stock ready',
-                                          emphasized: true,
-                                        ),
-                                        if ((item.qrCode ?? '')
-                                            .trim()
-                                            .isNotEmpty)
-                                          _ItemTag(
-                                            icon: Icons.qr_code_2_outlined,
-                                            label: 'QR ${item.qrCode}',
-                                          ),
-                                      ],
-                                    ),
-                                    if (item.serverQuantities.isNotEmpty) ...[
-                                      const SizedBox(height: 10),
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: item.serverQuantities.entries
-                                            .map(
-                                              (entry) => _ServerQtyTag(
-                                                serverName: entry.key,
-                                                quantity: entry.value,
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ServerQtyTag extends StatelessWidget {
-  const _ServerQtyTag({required this.serverName, required this.quantity});
-
-  final String serverName;
-  final int quantity;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF3FF),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '$serverName: $quantity',
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
+  return value.toStringAsFixed(2);
 }

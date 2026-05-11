@@ -981,17 +981,32 @@ def get_order_detail(
 
         order = _serialize_row(header_rows[0])
         order["itemTotalCount"] = item_total_count
-        order["items"] = [
-            {
-                "id": _serialize(row["id"]),
-                "lineNo": _serialize(row["line_no"]),
-                "itemMasterCode": _serialize(row["item_master_code"]),
-                "itemCode": _serialize(row["item_code"]),
-                "qrCode": _serialize(row["qr_code"]),
-                "itemName": _serialize(row["item_name"]),
-                "quantity": _serialize(row["quantity"]),
-                "createdAt": _serialize(row["created_at"]),
-            }
-            for row in rows_to_dicts(cursor)
-        ]
+        item_rows = rows_to_dicts(cursor)
+        order_items: list[dict[str, Any]] = []
+        for row in item_rows:
+            item_code = _clean_text(row.get("item_code"))
+            item_name_value = _clean_text(row.get("item_name"))
+            item_detail = None
+            lookup = item_code or item_name_value
+            if lookup:
+                try:
+                    item_detail, _image_path = _build_item_detail(cursor, lookup)
+                except Exception:
+                    item_detail = None
+
+            order_items.append(
+                {
+                    "id": _serialize(row["id"]),
+                    "lineNo": _serialize(row["line_no"]),
+                    "itemMasterCode": _serialize(row["item_master_code"]),
+                    "itemCode": _serialize(row["item_code"]),
+                    "qrCode": _serialize(row["qr_code"]),
+                    "itemName": _serialize(row["item_name"]),
+                    "quantity": _serialize(row["quantity"]),
+                    "createdAt": _serialize(row["created_at"]),
+                    "itemDetails": item_detail,
+                }
+            )
+
+        order["items"] = order_items
         return order

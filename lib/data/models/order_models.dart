@@ -64,14 +64,17 @@ class OrderItemModel {
     required this.itemCode,
     required this.itemName,
     required this.quantity,
+    this.itemDetails,
   });
 
   final String id;
   final String itemCode;
   final String itemName;
   final int quantity;
+  final MergedItemDetailModel? itemDetails;
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
+    final itemDetailsJson = json['itemDetails'] ?? json['item_details'];
     return OrderItemModel(
       id: (json['id'] ?? '').toString(),
       itemCode: (json['item_code'] ?? json['itemCode'] ?? json['code'] ?? '')
@@ -89,6 +92,11 @@ class OrderItemModel {
             json['total_qty'] ??
             json['totalQty'],
       ),
+      itemDetails: itemDetailsJson is Map
+          ? MergedItemDetailModel.fromJson(
+              Map<String, dynamic>.from(itemDetailsJson),
+            )
+          : null,
     );
   }
 }
@@ -179,6 +187,14 @@ class PriceCategoryModel {
   final double minFinalPrice;
   final double maxFinalPrice;
 
+  String get displayCode => _businessPriceCode(categoryCode, categoryName);
+
+  String get displayName =>
+      _businessPriceName(displayCode, fallback: categoryName);
+
+  bool get isPrimaryBusinessPrice =>
+      _primaryBusinessPriceCodes.contains(displayCode);
+
   factory PriceCategoryModel.fromJson(Map<String, dynamic> json) {
     return PriceCategoryModel(
       categoryNo: _parseInt(json['categoryNo'] ?? json['category_no']),
@@ -260,6 +276,14 @@ class ItemPriceModel {
   final double discountPercent;
   final double finalPrice;
   final String? effectiveDate;
+
+  String get displayCode => _businessPriceCode(categoryCode, categoryName);
+
+  String get displayName =>
+      _businessPriceName(displayCode, fallback: categoryName);
+
+  bool get isPrimaryBusinessPrice =>
+      _primaryBusinessPriceCodes.contains(displayCode);
 
   factory ItemPriceModel.fromJson(Map<String, dynamic> json) {
     return ItemPriceModel(
@@ -344,6 +368,69 @@ class MergedItemDetailModel {
   final List<ItemPriceModel> prices;
   final List<String> supportItemCodes;
   final List<String> warnings;
+
+  factory MergedItemDetailModel.fromJson(Map<String, dynamic> json) {
+    final imageJson = json['image'];
+    final pricesJson = json['prices'];
+    final branchStocksJson = json['branchStocks'] ?? json['branch_stocks'];
+
+    return MergedItemDetailModel(
+      itemMasterCode: _parseInt(
+        json['itemMasterCode'] ?? json['item_master_code'],
+      ),
+      itemCode: (json['itemCode'] ?? json['item_code'] ?? '').toString(),
+      itemName: (json['itemName'] ?? json['item_name'] ?? '').toString(),
+      itemGroup: (json['itemGroup'] ?? json['item_group'] ?? '').toString(),
+      qrCode: _parseNullableString(json['qrCode'] ?? json['qr_code']),
+      hsnCode: _parseNullableString(json['hsnCode'] ?? json['hsn_code']),
+      totalQuantity: _parseDouble(
+        json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
+      ),
+      totalQuantityValue: _parseDouble(
+        json['itemQuantityValue'] ?? json['item_quantity_value'],
+      ),
+      serverQuantities: const <String, double>{},
+      serverBranchStocks: <String, List<BranchStockModel>>{
+        if (branchStocksJson is List)
+          'All Branches': branchStocksJson
+              .whereType<Map>()
+              .map(
+                (item) => BranchStockModel.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .toList(),
+      },
+      image: imageJson is Map
+          ? ItemImageModel.fromJson(
+              Map<String, dynamic>.from(imageJson),
+              baseUrl: '',
+            )
+          : null,
+      imageUrls: imageJson is Map
+          ? <String>[
+              if (_parseNullableString(imageJson['url']) != null)
+                _parseNullableString(imageJson['url'])!,
+            ]
+          : const <String>[],
+      prices: pricesJson is List
+          ? pricesJson
+                .whereType<Map>()
+                .map(
+                  (item) =>
+                      ItemPriceModel.fromJson(Map<String, dynamic>.from(item)),
+                )
+                .toList()
+          : const <ItemPriceModel>[],
+      supportItemCodes: json['supportItemCodes'] is List
+          ? (json['supportItemCodes'] as List)
+                .map((value) => value.toString())
+                .where((value) => value.trim().isNotEmpty)
+                .toList()
+          : const <String>[],
+      warnings: const <String>[],
+    );
+  }
 
   ItemPriceModel priceFor(PriceCategoryModel? category) {
     if (category == null) {
@@ -492,12 +579,14 @@ class CartItemModel {
 
 class DraftOrderItem {
   const DraftOrderItem({
+    this.id = '',
     required this.itemCode,
     required this.itemName,
     required this.availableQuantity,
     required this.quantity,
   });
 
+  final String id;
   final String itemCode;
   final String itemName;
   final int availableQuantity;
@@ -506,12 +595,14 @@ class DraftOrderItem {
   String get key => '${itemCode.trim()}|${itemName.trim()}';
 
   DraftOrderItem copyWith({
+    String? id,
     String? itemCode,
     String? itemName,
     int? availableQuantity,
     int? quantity,
   }) {
     return DraftOrderItem(
+      id: id ?? this.id,
       itemCode: itemCode ?? this.itemCode,
       itemName: itemName ?? this.itemName,
       availableQuantity: availableQuantity ?? this.availableQuantity,
@@ -544,4 +635,28 @@ double _parseDouble(dynamic value) {
 String? _parseNullableString(dynamic value) {
   final text = value?.toString().trim() ?? '';
   return text.isEmpty ? null : text;
+}
+
+const Set<String> _primaryBusinessPriceCodes = {'A', 'W', 'C', 'H'};
+
+String _businessPriceCode(String categoryCode, String categoryName) {
+  final name = categoryName.trim().toUpperCase();
+  if (name == 'W' || name.startsWith('W ')) {
+    return 'W';
+  }
+  return categoryCode.trim().toUpperCase();
+}
+
+String _businessPriceName(String code, {required String fallback}) {
+  switch (code.trim().toUpperCase()) {
+    case 'A':
+      return 'Retail';
+    case 'W':
+      return 'Whoslesale';
+    case 'C':
+      return 'Corperate Gst Inclusive';
+    case 'H':
+      return 'Franchise';
+  }
+  return fallback.trim().isEmpty ? code : fallback;
 }

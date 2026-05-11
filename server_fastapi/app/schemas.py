@@ -188,6 +188,7 @@ class OrderItemSummary(BaseModel):
     itemName: str
     quantity: float
     createdAt: datetime
+    itemDetails: ItemDetail | None = None
 
 
 class OrderSummary(BaseModel):

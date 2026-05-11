@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -219,7 +220,7 @@ class HomeController extends GetxController {
 
   String selectedPriceLabelFor(MergedItemDetailModel detail) {
     final category = selectedPriceCategory;
-    return detail.priceFor(category).categoryName;
+    return detail.priceFor(category).displayName;
   }
 
   double selectedPriceForDetail(MergedItemDetailModel detail) {
@@ -540,21 +541,62 @@ class HomeController extends GetxController {
   }
 
   Future<bool> _checkServerHealth(String baseUrl) async {
+    final uri = Uri.parse('$baseUrl/health');
+    _logApiRequest('GET', uri, body: <String, dynamic>{});
     try {
       final response = await Dio().get<Map<String, dynamic>>(
-        '$baseUrl/health',
+        uri.toString(),
         options: Options(
           receiveTimeout: const Duration(seconds: 5),
           sendTimeout: const Duration(seconds: 5),
           headers: const <String, dynamic>{'Accept': 'application/json'},
         ),
       );
+      _logApiResponse(
+        'GET',
+        uri,
+        response.statusCode ?? 0,
+        response.data ?? <String, dynamic>{},
+      );
 
       return response.statusCode != null &&
           response.statusCode! >= 200 &&
           response.statusCode! < 300;
-    } catch (_) {
+    } catch (error) {
+      debugPrint('========== DASHBOARD API RESPONSE ==========');
+      debugPrint('GET $uri [ERROR]');
+      debugPrint('Body: ${_formatJsonForLog({'error': error.toString()})}');
       return false;
+    }
+  }
+
+  void _logApiRequest(String method, Uri uri, {Object? body}) {
+    debugPrint('========== DASHBOARD API REQUEST ==========');
+    debugPrint('$method $uri');
+    debugPrint('Body: ${_formatJsonForLog(body ?? <String, dynamic>{})}');
+  }
+
+  void _logApiResponse(String method, Uri uri, int statusCode, Object? body) {
+    debugPrint('========== DASHBOARD API RESPONSE ==========');
+    debugPrint('$method $uri [$statusCode]');
+    debugPrint('Body: ${_formatJsonForLog(body)}');
+  }
+
+  String _formatJsonForLog(Object? value) {
+    try {
+      final dynamic jsonValue;
+      if (value == null) {
+        jsonValue = <String, dynamic>{};
+      } else if (value is String) {
+        jsonValue = value.trim().isEmpty
+            ? <String, dynamic>{}
+            : jsonDecode(value);
+      } else {
+        jsonValue = value;
+      }
+      return const JsonEncoder.withIndent('  ').convert(jsonValue);
+    } catch (_) {
+      return value?.toString() ?? '';
     }
   }
 

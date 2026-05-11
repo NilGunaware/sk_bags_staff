@@ -18,5 +18,6 @@ class ApiEndpoints {
   static const String stockRemove = '/staff/stock/remove';
   static const String orderRead = '/staff/order/read';
   static const String orderStore = '/staff/order/store/0';
+  static String orderStoreById(String orderId) => '/staff/order/store/$orderId';
   static const String orderDetail = '/staff/order/get_detail';
 }

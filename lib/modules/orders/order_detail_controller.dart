@@ -11,6 +11,7 @@ class OrderDetailController extends GetxController {
   final detail = Rxn<OrderDetailModel>();
   final isLoading = false.obs;
   final errorMessage = RxnString();
+  bool wasUpdated = false;
 
   @override
   void onInit() {

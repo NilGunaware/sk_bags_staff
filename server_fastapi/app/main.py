@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import date
+import json
 import logging
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -80,6 +81,92 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def _should_log_api_body(path: str) -> bool:
+    return path == "/health" or path.startswith("/api/")
+
+
+def _is_json_content_type(content_type: str) -> bool:
+    return "application/json" in content_type.lower()
+
+
+def _format_json_log(raw_value: bytes | str | object | None) -> str:
+    if raw_value is None:
+        return "{}"
+
+    try:
+        if isinstance(raw_value, bytes):
+            if not raw_value:
+                return "{}"
+            raw_value = raw_value.decode("utf-8", errors="replace")
+
+        if isinstance(raw_value, str):
+            stripped = raw_value.strip()
+            if not stripped:
+                return "{}"
+            raw_value = json.loads(stripped)
+
+        return json.dumps(raw_value, indent=2, ensure_ascii=False, default=str)
+    except Exception:
+        return str(raw_value)
+
+
+@app.middleware("http")
+async def log_api_request_response(request: Request, call_next):
+    if not _should_log_api_body(request.url.path):
+        return await call_next(request)
+
+    request_body = await request.body()
+
+    async def receive_logged_body():
+        return {"type": "http.request", "body": request_body, "more_body": False}
+
+    request._receive = receive_logged_body
+    logger.info(
+        "========== API REQUEST ==========\n%s %s\nBody: %s",
+        request.method,
+        request.url,
+        _format_json_log(request_body),
+    )
+
+    try:
+        response = await call_next(request)
+    except Exception as error:
+        logger.info(
+            "========== API RESPONSE ==========\n%s %s [ERROR]\nBody: %s",
+            request.method,
+            request.url,
+            _format_json_log({"error": str(error)}),
+        )
+        raise
+
+    content_type = response.headers.get("content-type", "")
+    if not _is_json_content_type(content_type):
+        logger.info(
+            "========== API RESPONSE ==========\n%s %s [%s]\nBody: %s",
+            request.method,
+            request.url,
+            response.status_code,
+            "<non-json response omitted>",
+        )
+        return response
+
+    response_body = b"".join([chunk async for chunk in response.body_iterator])
+    logger.info(
+        "========== API RESPONSE ==========\n%s %s [%s]\nBody: %s",
+        request.method,
+        request.url,
+        response.status_code,
+        _format_json_log(response_body),
+    )
+    return Response(
+        content=response_body,
+        status_code=response.status_code,
+        headers=dict(response.headers),
+        media_type=response.media_type,
+        background=response.background,
+    )
 
 
 def _page(filename: str) -> FileResponse:
@@ -309,7 +396,11 @@ def orders_list(
 def orders_detail(
     order_id: int,
     item_page: int = Query(1, alias="itemPage", ge=1),
-    item_page_size: int = Query(20, alias="itemPageSize", ge=1),
+    item_page_size: int = Query(
+        settings.max_page_size,
+        alias="itemPageSize",
+        ge=1,
+    ),
     item_code: str = Query("", alias="itemCode"),
     item_name: str = Query("", alias="itemName"),
 ) -> OrderDetailResponse:

@@ -22,10 +22,11 @@ class OrderCartService extends GetxService {
   void setPriceCategories(List<PriceCategoryModel> categories) {
     priceCategories.assignAll(categories);
 
+    final billingCategories = _billingPriceCategories(categories);
     final current = selectedPriceCategory.value;
     if (current != null) {
       PriceCategoryModel? matching;
-      for (final item in categories) {
+      for (final item in billingCategories) {
         if (item.categoryNo == current.categoryNo) {
           matching = item;
           break;
@@ -37,8 +38,8 @@ class OrderCartService extends GetxService {
       }
     }
 
-    selectedPriceCategory.value = categories.isNotEmpty
-        ? categories.first
+    selectedPriceCategory.value = billingCategories.isNotEmpty
+        ? billingCategories.first
         : null;
   }
 
@@ -96,4 +97,18 @@ class OrderCartService extends GetxService {
   }
 
   void clear() => items.clear();
+}
+
+List<PriceCategoryModel> _billingPriceCategories(
+  List<PriceCategoryModel> categories,
+) {
+  final visible = categories
+      .where((category) => category.isPrimaryBusinessPrice)
+      .toList();
+  const order = <String>['A', 'W', 'C', 'H'];
+  visible.sort(
+    (a, b) =>
+        order.indexOf(a.displayCode).compareTo(order.indexOf(b.displayCode)),
+  );
+  return visible;
 }

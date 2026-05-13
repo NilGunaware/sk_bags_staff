@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../core/services/local_item_sync_service.dart';
 import '../../core/services/order_service.dart';
+import '../../core/services/storage_service.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
 
@@ -11,6 +12,7 @@ class OrderCreateController extends GetxController {
   final OrderService _orderService = Get.find<OrderService>();
   final LocalItemSyncService _itemSyncService =
       Get.find<LocalItemSyncService>();
+  final StorageService _storageService = Get.find<StorageService>();
 
   final formKey = GlobalKey<FormState>();
   final partyNameController = TextEditingController();
@@ -89,7 +91,20 @@ class OrderCreateController extends GetxController {
           order.indexOf(a.displayCode).compareTo(order.indexOf(b.displayCode)),
     );
     priceCategories.assignAll(visible);
-    selectedPriceCategory.value = visible.isNotEmpty ? visible.first : null;
+    final current = selectedPriceCategory.value;
+    PriceCategoryModel? matching;
+    if (current != null) {
+      for (final category in visible) {
+        if (category.categoryNo == current.categoryNo ||
+            category.displayCode == current.displayCode ||
+            category.slotId == current.slotId) {
+          matching = category;
+          break;
+        }
+      }
+    }
+    selectedPriceCategory.value =
+        matching ?? (visible.isNotEmpty ? visible.first : null);
   }
 
   void selectPriceCategory(PriceCategoryModel category) {
@@ -185,6 +200,8 @@ class OrderCreateController extends GetxController {
     nextEntryNo.value = int.tryParse(summary.entryNo) ?? 0;
     partyNameController.text = summary.partyName;
     partyMobileController.text = summary.partyMobile;
+    selectedPriceCategory.value =
+        detail.selectedPriceCategory ?? summary.selectedPriceCategory;
     final draftItems = detail.items
         .map(
           (item) => DraftOrderItem(
@@ -193,6 +210,10 @@ class OrderCreateController extends GetxController {
             itemName: item.itemName,
             availableQuantity: item.quantity <= 0 ? 999999 : item.quantity,
             quantity: item.quantity <= 0 ? 1 : item.quantity,
+            selectedPriceCategory:
+                item.selectedPriceCategory ??
+                detail.selectedPriceCategory ??
+                summary.selectedPriceCategory,
           ),
         )
         .toList();
@@ -448,6 +469,7 @@ class OrderCreateController extends GetxController {
               partyName: partyNameController.text.trim(),
               partyMobile: partyMobileController.text.trim(),
               items: selectedItems.toList(),
+              selectedPriceCategory: selectedPriceCategory.value,
             )
           : await _orderService.createOrder(
               uuid: orderUuid,
@@ -456,9 +478,11 @@ class OrderCreateController extends GetxController {
               partyName: partyNameController.text.trim(),
               partyMobile: partyMobileController.text.trim(),
               items: selectedItems.toList(),
+              selectedPriceCategory: selectedPriceCategory.value,
             );
 
       if (_orderService.isSuccessResponse(response)) {
+        await _saveSelectedPriceSelection(response);
         final message = _orderService.extractMessage(response);
         Get.back<Map<String, dynamic>>(
           result: <String, dynamic>{
@@ -489,18 +513,48 @@ class OrderCreateController extends GetxController {
   ];
 
   void _syncDraftItemsFromCart() {
+    final category = selectedPriceCategory.value;
     selectedItems.assignAll(
       cartItems.map((item) {
         final key = _draftKey(item.itemCode, item.itemName);
+        final selectedPrice = item.priceFor(category);
         return DraftOrderItem(
           id: itemIdsByKey[key] ?? itemIdsByKey[item.itemCode.trim()] ?? '',
           itemCode: item.itemCode,
           itemName: item.itemName,
           availableQuantity: item.availableQuantity,
           quantity: item.quantity,
+          selectedPriceCategory: category,
+          selectedFinalPrice: selectedPrice.finalPrice,
         );
       }),
     );
+  }
+
+  Future<void> _saveSelectedPriceSelection(Map<String, dynamic> response) {
+    return _storageService.saveOrderPriceSelection(
+      keys: _orderSelectionKeys(response),
+      category: selectedPriceCategory.value,
+    );
+  }
+
+  Iterable<String> _orderSelectionKeys(Map<String, dynamic> response) sync* {
+    final data = response['data'];
+    final dataMap = data is Map ? Map<String, dynamic>.from(data) : response;
+    final responseId = (dataMap['id'] ?? response['id'] ?? '').toString();
+
+    if (isEditMode && editingOrderId.trim().isNotEmpty) {
+      yield 'id:${editingOrderId.trim()}';
+    }
+    if (responseId.trim().isNotEmpty) {
+      yield 'id:${responseId.trim()}';
+    }
+    if (orderUuid.trim().isNotEmpty) {
+      yield 'uuid:${orderUuid.trim()}';
+    }
+    if (nextEntryNo.value > 0) {
+      yield 'entry:${nextEntryNo.value}';
+    }
   }
 
   String _draftKey(String itemCode, String itemName) =>

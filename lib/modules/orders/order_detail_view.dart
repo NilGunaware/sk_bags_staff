@@ -32,9 +32,9 @@ class OrderDetailView extends GetView<OrderDetailController> {
     ApiResponseHandler.showSuccessSnackbar(message);
   }
 
-  void _goBack() {
-    Get.back<Map<String, dynamic>?>(
-      result: controller.wasUpdated ? <String, dynamic>{'updated': true} : null,
+  void _goBack(BuildContext context) {
+    Navigator.of(context).pop<Map<String, dynamic>?>(
+      controller.wasUpdated ? <String, dynamic>{'updated': true} : null,
     );
   }
 
@@ -44,13 +44,16 @@ class OrderDetailView extends GetView<OrderDetailController> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          _goBack();
+          _goBack(context);
         }
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F7F4),
         appBar: AppBar(
-          leading: BackButton(onPressed: _goBack),
+          leading: IconButton(
+            onPressed: () => _goBack(context),
+            icon: const Icon(Icons.arrow_back),
+          ),
           title: const Text('Order Details'),
           actions: [
             Obx(() {
@@ -140,6 +143,9 @@ class OrderDetailView extends GetView<OrderDetailController> {
                   _ItemsCard(
                     items: items,
                     isLoading: controller.isLoading.value && detail == null,
+                    selectedPriceCategory:
+                        detail?.selectedPriceCategory ??
+                        summary.selectedPriceCategory,
                   ),
                 ],
               ),
@@ -473,10 +479,15 @@ class _InfoTile extends StatelessWidget {
 }
 
 class _ItemsCard extends StatelessWidget {
-  const _ItemsCard({required this.items, required this.isLoading});
+  const _ItemsCard({
+    required this.items,
+    required this.isLoading,
+    required this.selectedPriceCategory,
+  });
 
   final List<OrderItemModel> items;
   final bool isLoading;
+  final PriceCategoryModel? selectedPriceCategory;
 
   @override
   Widget build(BuildContext context) {
@@ -515,7 +526,11 @@ class _ItemsCard extends StatelessWidget {
           : Column(
               children: [
                 for (var index = 0; index < items.length; index++) ...[
-                  _ItemLineCard(index: index + 1, item: items[index]),
+                  _ItemLineCard(
+                    index: index + 1,
+                    item: items[index],
+                    selectedPriceCategory: selectedPriceCategory,
+                  ),
                   if (index != items.length - 1) const SizedBox(height: 12),
                 ],
               ],
@@ -525,15 +540,23 @@ class _ItemsCard extends StatelessWidget {
 }
 
 class _ItemLineCard extends StatelessWidget {
-  const _ItemLineCard({required this.index, required this.item});
+  const _ItemLineCard({
+    required this.index,
+    required this.item,
+    required this.selectedPriceCategory,
+  });
 
   final int index;
   final OrderItemModel item;
+  final PriceCategoryModel? selectedPriceCategory;
 
   @override
   Widget build(BuildContext context) {
     final detail = item.itemDetails;
-    final prices = _visiblePrices(detail?.prices ?? const <ItemPriceModel>[]);
+    final selectedPrice = _selectedPrice(
+      detail?.prices ?? const <ItemPriceModel>[],
+      item.selectedPriceCategory ?? selectedPriceCategory,
+    );
     final detailImageUrl = detail?.image?.url;
     final imageUrls = <String>[
       ...?detail?.imageUrls,
@@ -619,19 +642,9 @@ class _ItemLineCard extends StatelessWidget {
               ],
             ),
           ],
-          if (prices.isNotEmpty) ...[
+          if (selectedPrice != null) ...[
             const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final price in prices) ...[
-                    _PriceBadge(price: price),
-                    const SizedBox(width: 8),
-                  ],
-                ],
-              ),
-            ),
+            _PriceBadge(price: selectedPrice),
           ],
         ],
       ),
@@ -904,17 +917,53 @@ class _DetailEmptyState extends StatelessWidget {
   }
 }
 
-List<ItemPriceModel> _visiblePrices(List<ItemPriceModel> prices) {
+ItemPriceModel? _selectedPrice(
+  List<ItemPriceModel> prices,
+  PriceCategoryModel? category,
+) {
+  if (prices.isEmpty) {
+    return null;
+  }
+
+  if (category != null) {
+    for (final price in prices) {
+      if (_priceMatchesCategory(price, category)) {
+        return price;
+      }
+    }
+    return ItemPriceModel(
+      slotId: category.slotId,
+      categoryNo: category.categoryNo,
+      categoryCode: category.categoryCode,
+      categoryName: category.categoryName,
+      basePrice: 0,
+      discountPercent: 0,
+      finalPrice: 0,
+    );
+  }
+
   final visible = prices
       .where((price) => price.isPrimaryBusinessPrice)
       .toList();
-  final source = visible.isEmpty ? prices.take(4).toList() : visible;
+  final source = visible.isEmpty ? prices.toList() : visible;
   const order = <String>['A', 'W', 'C', 'H'];
   source.sort(
     (a, b) =>
         order.indexOf(a.displayCode).compareTo(order.indexOf(b.displayCode)),
   );
-  return source.take(4).toList();
+  return source.first;
+}
+
+bool _priceMatchesCategory(ItemPriceModel price, PriceCategoryModel category) {
+  final priceCode = price.displayCode.trim().toLowerCase();
+  final categoryCode = category.displayCode.trim().toLowerCase();
+  final priceName = price.displayName.trim().toLowerCase();
+  final categoryName = category.displayName.trim().toLowerCase();
+
+  return price.categoryNo == category.categoryNo ||
+      price.slotId == category.slotId ||
+      (priceCode.isNotEmpty && priceCode == categoryCode) ||
+      (priceName.isNotEmpty && priceName == categoryName);
 }
 
 String _dash(String value) {

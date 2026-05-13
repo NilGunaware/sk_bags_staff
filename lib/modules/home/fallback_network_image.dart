@@ -7,12 +7,14 @@ class FallbackNetworkImage extends StatefulWidget {
     required this.iconColor,
     this.fit = BoxFit.cover,
     this.iconSize = 34,
+    this.enablePreview = true,
   });
 
   final List<String> imageUrls;
   final Color iconColor;
   final BoxFit fit;
   final double iconSize;
+  final bool enablePreview;
 
   @override
   State<FallbackNetworkImage> createState() => _FallbackNetworkImageState();
@@ -49,26 +51,32 @@ class _FallbackNetworkImageState extends State<FallbackNetworkImage> {
       return _emptyIcon();
     }
 
+    final image = Image.network(
+      urls[index],
+      fit: widget.fit,
+      errorBuilder: (context, error, stackTrace) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _activeIndex != index) {
+            return;
+          }
+          setState(
+            () => _activeIndex = index < urls.length - 1
+                ? index + 1
+                : urls.length,
+          );
+        });
+        return _emptyIcon();
+      },
+    );
+
+    if (!widget.enablePreview) {
+      return image;
+    }
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _openImagePreview(context, urls, index),
-      child: Image.network(
-        urls[index],
-        fit: widget.fit,
-        errorBuilder: (context, error, stackTrace) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || _activeIndex != index) {
-              return;
-            }
-            setState(
-              () => _activeIndex = index < urls.length - 1
-                  ? index + 1
-                  : urls.length,
-            );
-          });
-          return _emptyIcon();
-        },
-      ),
+      child: image,
     );
   }
 
@@ -77,13 +85,17 @@ class _FallbackNetworkImageState extends State<FallbackNetworkImage> {
     List<String> urls,
     int initialIndex,
   ) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _FullScreenImagePreview(
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Close image preview',
+      barrierColor: Colors.black,
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return _FullScreenImagePreview(
           imageUrls: urls,
           initialIndex: initialIndex,
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -129,57 +141,110 @@ class _FullScreenImagePreviewState extends State<_FullScreenImagePreview> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          widget.imageUrls.length > 1
-              ? '${_activeIndex + 1}/${widget.imageUrls.length}'
-              : 'Image',
-        ),
-      ),
-      body: SafeArea(
-        child: PageView.builder(
-          controller: _pageController,
-          onPageChanged: (index) => setState(() => _activeIndex = index),
-          itemCount: widget.imageUrls.length,
-          itemBuilder: (context, index) {
-            return InteractiveViewer(
-              minScale: 1,
-              maxScale: 5,
-              child: Center(
-                child: Image.network(
-                  widget.imageUrls[index],
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.image_not_supported_outlined,
-                          color: Colors.white70,
-                          size: 54,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'Image not available',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+    return Material(
+      color: Colors.black,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: SafeArea(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) => setState(() => _activeIndex = index),
+                itemCount: widget.imageUrls.length,
+                itemBuilder: (context, index) {
+                  return InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 5,
+                    child: Center(
+                      child: Image.network(
+                        widget.imageUrls[index],
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.image_not_supported_outlined,
+                                color: Colors.white70,
+                                size: 54,
+                              ),
+                              SizedBox(height: 12),
+                              Text(
+                                'Image not available',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 12,
+            right: 12,
+            child: Row(
+              children: [
+                Material(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    onPressed: _closePreview,
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    tooltip: 'Close',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.imageUrls.length > 1
+                        ? '${_activeIndex + 1}/${widget.imageUrls.length}'
+                        : 'Image Preview',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            child: SafeArea(
+              top: false,
+              child: ElevatedButton.icon(
+                onPressed: _closePreview,
+                icon: const Icon(Icons.close),
+                label: const Text('Close Preview'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  void _closePreview() {
+    Navigator.of(context, rootNavigator: true).pop();
   }
 }

@@ -12,6 +12,7 @@ import '../../core/constants/api_endpoints.dart';
 import '../../core/services/local_item_sync_service.dart';
 import '../../core/services/order_cart_service.dart';
 import '../../core/services/order_service.dart';
+import '../../core/services/storage_service.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
 import '../../data/providers/api_provider.dart';
@@ -26,6 +27,7 @@ class HomeController extends GetxController {
   final LocalItemSyncService _itemSyncService =
       Get.find<LocalItemSyncService>();
   final OrderService _orderService = Get.find<OrderService>();
+  final StorageService _storageService = Get.find<StorageService>();
   final OrderCartService cartService = Get.find<OrderCartService>();
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -175,28 +177,40 @@ class HomeController extends GetxController {
     isPlacingCartOrder.value = true;
     try {
       final nextEntryNo = await _orderService.suggestNextEntryNo();
-      final draftItems = cartService.items
-          .map(
-            (item) => DraftOrderItem(
-              itemCode: item.itemCode,
-              itemName: item.itemName,
-              availableQuantity: item.availableQuantity,
-              quantity: item.quantity,
-            ),
-          )
-          .toList();
+      final orderUuid = DateTime.now().millisecondsSinceEpoch.toString();
+      final selectedCategory = selectedPriceCategory;
+      final draftItems = cartService.items.map((item) {
+        final selectedPrice = item.priceFor(selectedCategory);
+        return DraftOrderItem(
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          availableQuantity: item.availableQuantity,
+          quantity: item.quantity,
+          selectedPriceCategory: selectedCategory,
+          selectedFinalPrice: selectedPrice.finalPrice,
+        );
+      }).toList();
 
       final response = await _orderService.createOrder(
-        uuid: DateTime.now().millisecondsSinceEpoch.toString(),
+        uuid: orderUuid,
         entryNo: nextEntryNo,
         entryDate: _entryDate,
         partyName: trimmedName,
         partyMobile: trimmedMobile,
         items: draftItems,
+        selectedPriceCategory: selectedCategory,
       );
 
       if (_orderService.isSuccessResponse(response)) {
         final message = _orderService.extractMessage(response);
+        await _storageService.saveOrderPriceSelection(
+          keys: _orderSelectionKeys(
+            response: response,
+            uuid: orderUuid,
+            entryNo: nextEntryNo,
+          ),
+          category: selectedCategory,
+        );
         cartService.clear();
         ApiResponseHandler.showSuccessSnackbar(
           message.isEmpty ? 'Order created successfully' : message,
@@ -250,6 +264,26 @@ class HomeController extends GetxController {
       '${DateTime.now().year}-'
       '${DateTime.now().month.toString().padLeft(2, '0')}-'
       '${DateTime.now().day.toString().padLeft(2, '0')}';
+
+  Iterable<String> _orderSelectionKeys({
+    required Map<String, dynamic> response,
+    required String uuid,
+    required int entryNo,
+  }) sync* {
+    final data = response['data'];
+    final dataMap = data is Map ? Map<String, dynamic>.from(data) : response;
+    final responseId = (dataMap['id'] ?? response['id'] ?? '').toString();
+
+    if (responseId.trim().isNotEmpty) {
+      yield 'id:${responseId.trim()}';
+    }
+    if (uuid.trim().isNotEmpty) {
+      yield 'uuid:${uuid.trim()}';
+    }
+    if (entryNo > 0) {
+      yield 'entry:$entryNo';
+    }
+  }
 
   Future<void> fetchStockList({bool refresh = false}) async {
     if (refresh) {

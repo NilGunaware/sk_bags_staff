@@ -94,6 +94,7 @@ class OrderService extends GetxService {
     required String partyName,
     required String partyMobile,
     required List<DraftOrderItem> items,
+    PriceCategoryModel? selectedPriceCategory,
   }) {
     return _apiProvider.post(
       ApiEndpoints.orderStore,
@@ -104,6 +105,7 @@ class OrderService extends GetxService {
         partyName: partyName,
         partyMobile: partyMobile,
         items: items,
+        selectedPriceCategory: selectedPriceCategory,
       ),
     );
   }
@@ -116,6 +118,7 @@ class OrderService extends GetxService {
     required String partyName,
     required String partyMobile,
     required List<DraftOrderItem> items,
+    PriceCategoryModel? selectedPriceCategory,
   }) {
     return _apiProvider.post(
       ApiEndpoints.orderStoreById(orderId),
@@ -126,6 +129,7 @@ class OrderService extends GetxService {
         partyName: partyName,
         partyMobile: partyMobile,
         items: items,
+        selectedPriceCategory: selectedPriceCategory,
       ),
     );
   }
@@ -166,26 +170,46 @@ class OrderService extends GetxService {
     required String partyName,
     required String partyMobile,
     required List<DraftOrderItem> items,
+    PriceCategoryModel? selectedPriceCategory,
   }) {
+    final pricePayload = _priceCategoryPayload(selectedPriceCategory);
     return <String, dynamic>{
       'uuid': uuid,
       'entry_no': entryNo,
       'entry_date': entryDate,
       'party_name': partyName,
       'party_mobile': partyMobile,
+      ...pricePayload,
       'total_qty': items
           .fold<int>(0, (sum, item) => sum + item.quantity)
           .toString(),
-      'items': items
-          .map(
-            (item) => <String, dynamic>{
-              'id': item.id.isEmpty ? 0 : item.id,
-              'item_code': item.itemCode,
-              'item_name': item.itemName,
-              'qty': item.quantity,
-            },
-          )
-          .toList(),
+      'items': items.map((item) {
+        final itemPriceCategory =
+            item.selectedPriceCategory ?? selectedPriceCategory;
+        final itemPricePayload = _priceCategoryPayload(itemPriceCategory);
+        return <String, dynamic>{
+          'id': item.id.isEmpty ? 0 : item.id,
+          'item_code': item.itemCode,
+          'item_name': item.itemName,
+          'qty': item.quantity,
+          ...itemPricePayload,
+          if (item.selectedFinalPrice != null)
+            'selected_final_price': item.selectedFinalPrice,
+        };
+      }).toList(),
+    };
+  }
+
+  Map<String, dynamic> _priceCategoryPayload(PriceCategoryModel? category) {
+    if (category == null) {
+      return <String, dynamic>{};
+    }
+    return <String, dynamic>{
+      'price_category_no': category.categoryNo,
+      'price_category_code': category.categoryCode,
+      'price_category_name': category.displayName,
+      'price_slot_id': category.slotId,
+      'selected_price_category': category.toSelectionJson(),
     };
   }
 

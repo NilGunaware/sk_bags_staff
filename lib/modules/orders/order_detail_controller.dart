@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../core/services/local_item_sync_service.dart';
 import '../../core/services/order_service.dart';
+import '../../core/services/storage_service.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
 
@@ -9,6 +10,7 @@ class OrderDetailController extends GetxController {
   final OrderService _orderService = Get.find<OrderService>();
   final LocalItemSyncService _itemSyncService =
       Get.find<LocalItemSyncService>();
+  final StorageService _storageService = Get.find<StorageService>();
 
   final order = Rxn<OrderSummaryModel>();
   final detail = Rxn<OrderDetailModel>();
@@ -41,7 +43,7 @@ class OrderDetailController extends GetxController {
       final loadedDetail = await _orderService.fetchOrderDetail(
         currentOrder.id,
       );
-      detail.value = loadedDetail;
+      detail.value = _applyCachedPriceSelection(loadedDetail);
       await hydrateItemDetails();
     } catch (error) {
       errorMessage.value = _friendlyOrderDetailMessage(error);
@@ -86,11 +88,7 @@ class OrderDetailController extends GetxController {
         }
       }
 
-      detail.value = OrderDetailModel(
-        summary: currentDetail.summary,
-        items: hydratedItems,
-        raw: currentDetail.raw,
-      );
+      detail.value = currentDetail.copyWith(items: hydratedItems);
 
       final uniqueWarnings = <String>[];
       for (final warning in warnings) {
@@ -101,6 +99,33 @@ class OrderDetailController extends GetxController {
       itemDetailWarnings.assignAll(uniqueWarnings);
     } finally {
       isHydratingItems.value = false;
+    }
+  }
+
+  OrderDetailModel _applyCachedPriceSelection(OrderDetailModel loadedDetail) {
+    final selectedCategory =
+        _storageService.readOrderPriceSelection(
+          _orderSelectionKeys(loadedDetail.summary),
+        ) ??
+        loadedDetail.selectedPriceCategory ??
+        loadedDetail.summary.selectedPriceCategory;
+
+    if (selectedCategory == null) {
+      return loadedDetail;
+    }
+
+    return loadedDetail.copyWith(selectedPriceCategory: selectedCategory);
+  }
+
+  Iterable<String> _orderSelectionKeys(OrderSummaryModel summary) sync* {
+    if (summary.id.trim().isNotEmpty) {
+      yield 'id:${summary.id.trim()}';
+    }
+    if (summary.uuid.trim().isNotEmpty) {
+      yield 'uuid:${summary.uuid.trim()}';
+    }
+    if (summary.entryNo.trim().isNotEmpty) {
+      yield 'entry:${summary.entryNo.trim()}';
     }
   }
 

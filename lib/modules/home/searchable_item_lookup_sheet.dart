@@ -408,6 +408,7 @@ class _LookupResultTile extends StatelessWidget {
                     imageUrls: item.imageUrls,
                     iconColor: AppColors.primary,
                     iconSize: 20,
+                    enablePreview: false,
                   ),
                 ),
               ),

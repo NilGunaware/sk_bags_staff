@@ -20,6 +20,7 @@ class OrderSummaryModel {
     required this.partyMobile,
     required this.totalQty,
     required this.raw,
+    this.selectedPriceCategory,
   });
 
   final String id;
@@ -30,6 +31,7 @@ class OrderSummaryModel {
   final String partyMobile;
   final int totalQty;
   final Map<String, dynamic> raw;
+  final PriceCategoryModel? selectedPriceCategory;
 
   factory OrderSummaryModel.fromJson(Map<String, dynamic> json) {
     return OrderSummaryModel(
@@ -42,6 +44,7 @@ class OrderSummaryModel {
           .toString(),
       totalQty: _parseInt(json['total_qty'] ?? json['totalQty'] ?? json['qty']),
       raw: Map<String, dynamic>.from(json),
+      selectedPriceCategory: _parseOrderPriceCategory(json),
     );
   }
 }
@@ -51,11 +54,28 @@ class OrderDetailModel {
     required this.summary,
     required this.items,
     required this.raw,
+    this.selectedPriceCategory,
   });
 
   final OrderSummaryModel summary;
   final List<OrderItemModel> items;
   final Map<String, dynamic> raw;
+  final PriceCategoryModel? selectedPriceCategory;
+
+  OrderDetailModel copyWith({
+    OrderSummaryModel? summary,
+    List<OrderItemModel>? items,
+    Map<String, dynamic>? raw,
+    PriceCategoryModel? selectedPriceCategory,
+  }) {
+    return OrderDetailModel(
+      summary: summary ?? this.summary,
+      items: items ?? this.items,
+      raw: raw ?? this.raw,
+      selectedPriceCategory:
+          selectedPriceCategory ?? this.selectedPriceCategory,
+    );
+  }
 }
 
 class OrderItemModel {
@@ -65,6 +85,7 @@ class OrderItemModel {
     required this.itemName,
     required this.quantity,
     this.itemDetails,
+    this.selectedPriceCategory,
   });
 
   final String id;
@@ -72,6 +93,7 @@ class OrderItemModel {
   final String itemName;
   final int quantity;
   final MergedItemDetailModel? itemDetails;
+  final PriceCategoryModel? selectedPriceCategory;
 
   OrderItemModel copyWith({
     String? id,
@@ -79,6 +101,7 @@ class OrderItemModel {
     String? itemName,
     int? quantity,
     MergedItemDetailModel? itemDetails,
+    PriceCategoryModel? selectedPriceCategory,
   }) {
     return OrderItemModel(
       id: id ?? this.id,
@@ -86,6 +109,8 @@ class OrderItemModel {
       itemName: itemName ?? this.itemName,
       quantity: quantity ?? this.quantity,
       itemDetails: itemDetails ?? this.itemDetails,
+      selectedPriceCategory:
+          selectedPriceCategory ?? this.selectedPriceCategory,
     );
   }
 
@@ -113,6 +138,7 @@ class OrderItemModel {
               Map<String, dynamic>.from(itemDetailsJson),
             )
           : null,
+      selectedPriceCategory: _parseOrderPriceCategory(json),
     );
   }
 }
@@ -249,6 +275,15 @@ class PriceCategoryModel {
         json['maxFinalPrice'] ?? json['max_final_price'],
       ),
     );
+  }
+
+  Map<String, dynamic> toSelectionJson() {
+    return <String, dynamic>{
+      'categoryNo': categoryNo,
+      'categoryCode': categoryCode,
+      'slotId': slotId,
+      'categoryName': categoryName,
+    };
   }
 }
 
@@ -617,6 +652,8 @@ class DraftOrderItem {
     required this.itemName,
     required this.availableQuantity,
     required this.quantity,
+    this.selectedPriceCategory,
+    this.selectedFinalPrice,
   });
 
   final String id;
@@ -624,6 +661,8 @@ class DraftOrderItem {
   final String itemName;
   final int availableQuantity;
   final int quantity;
+  final PriceCategoryModel? selectedPriceCategory;
+  final double? selectedFinalPrice;
 
   String get key => '${itemCode.trim()}|${itemName.trim()}';
 
@@ -633,6 +672,8 @@ class DraftOrderItem {
     String? itemName,
     int? availableQuantity,
     int? quantity,
+    PriceCategoryModel? selectedPriceCategory,
+    double? selectedFinalPrice,
   }) {
     return DraftOrderItem(
       id: id ?? this.id,
@@ -640,6 +681,9 @@ class DraftOrderItem {
       itemName: itemName ?? this.itemName,
       availableQuantity: availableQuantity ?? this.availableQuantity,
       quantity: quantity ?? this.quantity,
+      selectedPriceCategory:
+          selectedPriceCategory ?? this.selectedPriceCategory,
+      selectedFinalPrice: selectedFinalPrice ?? this.selectedFinalPrice,
     );
   }
 }
@@ -668,6 +712,81 @@ double _parseDouble(dynamic value) {
 String? _parseNullableString(dynamic value) {
   final text = value?.toString().trim() ?? '';
   return text.isEmpty ? null : text;
+}
+
+PriceCategoryModel? _parseOrderPriceCategory(Map<String, dynamic> json) {
+  final nested =
+      json['selected_price_category'] ??
+      json['selectedPriceCategory'] ??
+      json['price_category'] ??
+      json['priceCategory'];
+  if (nested is Map) {
+    final parsed = _parseOrderPriceCategory(Map<String, dynamic>.from(nested));
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+
+  final categoryNo = _parseInt(
+    json['price_category_no'] ??
+        json['priceCategoryNo'] ??
+        json['selected_price_category_no'] ??
+        json['selectedPriceCategoryNo'] ??
+        json['categoryNo'],
+  );
+  final slotId = _parseInt(
+    json['price_slot_id'] ??
+        json['priceSlotId'] ??
+        json['selected_price_slot_id'] ??
+        json['selectedPriceSlotId'] ??
+        json['slotId'],
+  );
+  final code =
+      (json['price_category_code'] ??
+              json['priceCategoryCode'] ??
+              json['selected_price_category_code'] ??
+              json['selectedPriceCategoryCode'] ??
+              json['categoryCode'] ??
+              '')
+          .toString();
+  final name =
+      (json['price_category_name'] ??
+              json['priceCategoryName'] ??
+              json['selected_price_category_name'] ??
+              json['selectedPriceCategoryName'] ??
+              json['categoryName'] ??
+              '')
+          .toString();
+
+  if (categoryNo <= 0 && slotId <= 0 && code.trim().isEmpty) {
+    return null;
+  }
+
+  final resolvedCode = code.trim().isNotEmpty
+      ? code.trim()
+      : categoryNo > 0
+      ? String.fromCharCode(64 + categoryNo)
+      : '';
+  final resolvedNo = categoryNo > 0
+      ? categoryNo
+      : resolvedCode.length == 1
+      ? resolvedCode.toUpperCase().codeUnitAt(0) - 64
+      : 0;
+  final resolvedSlotId = slotId > 0 ? slotId : 100 + resolvedNo;
+
+  return PriceCategoryModel(
+    categoryNo: resolvedNo,
+    categoryCode: resolvedCode,
+    slotId: resolvedSlotId,
+    categoryName: name.trim().isNotEmpty
+        ? name.trim()
+        : _businessPriceName(resolvedCode, fallback: resolvedCode),
+    itemCount: 0,
+    accountCount: 0,
+    discountedItemCount: 0,
+    minFinalPrice: 0,
+    maxFinalPrice: 0,
+  );
 }
 
 const Set<String> _primaryBusinessPriceCodes = {'A', 'W', 'C', 'H'};

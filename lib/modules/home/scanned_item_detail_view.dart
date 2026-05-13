@@ -71,7 +71,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Get.back(),
+                  onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Back'),
                 ),
               ),
@@ -86,7 +86,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                             quantity: quantity,
                             showSuccessMessage: false,
                           );
-                          Get.back(result: true);
+                          Navigator.of(context).pop(true);
                           ApiResponseHandler.showSuccessSnackbar(
                             'Added to cart',
                           );

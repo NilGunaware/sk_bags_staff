@@ -48,25 +48,21 @@ class OrderCartService extends GetxService {
   }
 
   void addFromDetail(MergedItemDetailModel detail, {int quantity = 1}) {
-    final maxAllowed = detail.availableOrderQuantity;
-    if (maxAllowed <= 0) {
-      return;
-    }
+    final safeQuantity = quantity <= 0 ? 1 : quantity;
+    final availableQuantity = detail.availableOrderQuantity;
 
     final existingIndex = items.indexWhere(
       (item) =>
-          item.key == CartItemModel.fromDetail(detail, quantity: quantity).key,
+          item.key ==
+          CartItemModel.fromDetail(detail, quantity: safeQuantity).key,
     );
 
     if (existingIndex >= 0) {
       final existing = items[existingIndex];
-      final updatedQuantity = (existing.quantity + quantity).clamp(
-        1,
-        maxAllowed,
-      );
+      final updatedQuantity = existing.quantity + safeQuantity;
       items[existingIndex] = existing.copyWith(
         quantity: updatedQuantity,
-        availableQuantity: maxAllowed,
+        availableQuantity: availableQuantity,
         serverQuantities: detail.serverQuantities,
         prices: detail.prices,
         imageUrl: detail.image?.url,
@@ -76,9 +72,7 @@ class OrderCartService extends GetxService {
       return;
     }
 
-    items.add(
-      CartItemModel.fromDetail(detail, quantity: quantity.clamp(1, maxAllowed)),
-    );
+    items.add(CartItemModel.fromDetail(detail, quantity: safeQuantity));
   }
 
   void updateQuantity(CartItemModel item, int quantity) {
@@ -87,8 +81,8 @@ class OrderCartService extends GetxService {
       return;
     }
 
-    final clamped = quantity.clamp(1, item.availableQuantity);
-    items[index] = item.copyWith(quantity: clamped);
+    final safeQuantity = quantity <= 0 ? 1 : quantity;
+    items[index] = item.copyWith(quantity: safeQuantity);
     items.refresh();
   }
 

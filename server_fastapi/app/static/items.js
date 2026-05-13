@@ -128,14 +128,34 @@ document.addEventListener("DOMContentLoaded", async () => {
       refs.nextBtn.disabled = response.pagination.page >= response.pagination.totalPages;
 
       if (!response.data.length) {
-        refs.tableBody.innerHTML = `<tr><td class="empty" colspan="7">No items matched the current filters.</td></tr>`;
+        refs.tableBody.innerHTML = `<tr><td class="empty" colspan="8">No items matched the current filters.</td></tr>`;
         return;
       }
 
       refs.tableBody.innerHTML = response.data
-        .map(
-          (item) => `
+        .map((item) => {
+          const imageBlock =
+            item.image && item.image.available && item.image.url
+              ? `
+                <button
+                  class="item-thumb-button"
+                  type="button"
+                  data-image-preview-url="${SKBags.escapeAttribute(item.image.url)}"
+                  data-image-preview-title="${SKBags.escapeAttribute(item.itemName)}"
+                >
+                  <img
+                    class="item-thumb"
+                    src="${SKBags.escapeAttribute(item.image.url)}"
+                    alt="${SKBags.escapeAttribute(item.itemName)}"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
+                  />
+                  <span class="item-thumb item-thumb-empty" style="display:none;">No image</span>
+                </button>
+              `
+              : `<span class="item-thumb item-thumb-empty">No image</span>`;
+          return `
             <tr data-item-lookup="${SKBags.escapeAttribute(item.itemCode || item.qrCode || "")}">
+              <td>${imageBlock}</td>
               <td>${SKBags.escapeHtml(item.itemCode || "-")}</td>
               <td>${SKBags.escapeHtml(item.itemName)}</td>
               <td>${SKBags.escapeHtml(item.itemGroup || "-")}</td>
@@ -157,8 +177,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 </div>
               </td>
             </tr>
-          `,
-        )
+          `;
+        })
         .join("");
 
       refs.tableBody.querySelectorAll("[data-add]").forEach((button) => {

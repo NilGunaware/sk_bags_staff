@@ -73,6 +73,22 @@ class OrderItemModel {
   final int quantity;
   final MergedItemDetailModel? itemDetails;
 
+  OrderItemModel copyWith({
+    String? id,
+    String? itemCode,
+    String? itemName,
+    int? quantity,
+    MergedItemDetailModel? itemDetails,
+  }) {
+    return OrderItemModel(
+      id: id ?? this.id,
+      itemCode: itemCode ?? this.itemCode,
+      itemName: itemName ?? this.itemName,
+      quantity: quantity ?? this.quantity,
+      itemDetails: itemDetails ?? this.itemDetails,
+    );
+  }
+
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     final itemDetailsJson = json['itemDetails'] ?? json['item_details'];
     return OrderItemModel(
@@ -119,6 +135,7 @@ class MergedItemModel {
     required this.itemName,
     required this.totalQuantity,
     required this.serverQuantities,
+    this.imageUrls = const <String>[],
     this.qrCode,
   });
 
@@ -126,6 +143,7 @@ class MergedItemModel {
   final String itemName;
   final int totalQuantity;
   final Map<String, int> serverQuantities;
+  final List<String> imageUrls;
   final String? qrCode;
 
   String get key => '${itemCode.trim()}|${itemName.trim()}';
@@ -142,6 +160,10 @@ class MergedItemModel {
       itemName: itemName,
       totalQuantity: totalQuantity + other.totalQuantity,
       serverQuantities: mergedQuantities,
+      imageUrls: <String>{
+        ...imageUrls,
+        ...other.imageUrls,
+      }.where((url) => url.trim().isNotEmpty).toList(),
       qrCode: (qrCode?.trim().isNotEmpty ?? false) ? qrCode : other.qrCode,
     );
   }
@@ -149,16 +171,28 @@ class MergedItemModel {
   factory MergedItemModel.fromServerJson(
     Map<String, dynamic> json, {
     required String serverName,
+    required String baseUrl,
   }) {
     final quantity = _parseInt(
       json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
     );
+    final imageJson = json['image'];
+    final image = imageJson is Map
+        ? ItemImageModel.fromJson(
+            Map<String, dynamic>.from(imageJson),
+            baseUrl: baseUrl,
+          )
+        : null;
 
     return MergedItemModel(
       itemCode: (json['itemCode'] ?? json['item_code'] ?? '').toString(),
       itemName: (json['itemName'] ?? json['item_name'] ?? '').toString(),
       totalQuantity: quantity,
       serverQuantities: <String, int>{serverName: quantity},
+      imageUrls: <String>[
+        if ((image?.available ?? false) && (image?.url?.isNotEmpty ?? false))
+          image!.url!,
+      ],
       qrCode: _parseNullableString(json['qrCode'] ?? json['qr_code']),
     );
   }
@@ -395,9 +429,8 @@ class MergedItemDetailModel {
           'All Branches': branchStocksJson
               .whereType<Map>()
               .map(
-                (item) => BranchStockModel.fromJson(
-                  Map<String, dynamic>.from(item),
-                ),
+                (item) =>
+                    BranchStockModel.fromJson(Map<String, dynamic>.from(item)),
               )
               .toList(),
       },

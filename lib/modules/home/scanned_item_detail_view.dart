@@ -26,7 +26,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
   @override
   void initState() {
     super.initState();
-    quantity = widget.detail.availableOrderQuantity > 0 ? 1 : 0;
+    quantity = 1;
     _quantityController = TextEditingController(text: quantity.toString());
   }
 
@@ -37,10 +37,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
   }
 
   void _setQuantity(int nextQuantity, {bool syncInput = true}) {
-    final maxAllowed = widget.detail.availableOrderQuantity;
-    final clamped = maxAllowed <= 0
-        ? 0
-        : nextQuantity.clamp(1, maxAllowed).toInt();
+    final clamped = nextQuantity <= 0 ? 1 : nextQuantity;
     setState(() => quantity = clamped);
     if (syncInput) {
       _quantityController.value = TextEditingValue(
@@ -54,11 +51,6 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
     final parsed = int.tryParse(value.trim());
     if (parsed == null) {
       setState(() => quantity = 0);
-      return;
-    }
-    final maxAllowed = widget.detail.availableOrderQuantity;
-    if (parsed > maxAllowed) {
-      _setQuantity(maxAllowed);
       return;
     }
     setState(() => quantity = parsed);
@@ -86,10 +78,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed:
-                      detail.availableOrderQuantity <= 0 ||
-                          quantity <= 0 ||
-                          quantity > detail.availableOrderQuantity
+                  onPressed: quantity <= 0
                       ? null
                       : () {
                           controller.addToCart(
@@ -183,7 +172,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'You can add up to ${detail.availableOrderQuantity} item(s) to the cart.',
+                      'Live stock is ${detail.availableOrderQuantity}. Order quantity is not limited by stock.',
                       style: TextStyle(color: Colors.grey.shade700),
                     ),
                     const SizedBox(height: 16),
@@ -227,9 +216,7 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
                         ),
                         _StepButton(
                           icon: Icons.add,
-                          onTap: quantity < detail.availableOrderQuantity
-                              ? () => _setQuantity(quantity + 1)
-                              : null,
+                          onTap: () => _setQuantity(quantity + 1),
                         ),
                       ],
                     ),
@@ -341,9 +328,7 @@ class _HeroCard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         _InfoChip(label: 'Code ${detail.itemCode}'),
-                        _InfoChip(
-                          label: 'QR ${detail.qrCode ?? detail.itemCode}',
-                        ),
+
                         if ((detail.hsnCode ?? '').isNotEmpty)
                           _InfoChip(label: 'HSN ${detail.hsnCode}'),
                       ],
@@ -533,9 +518,7 @@ class _StepButton extends StatelessWidget {
   }
 }
 
-String _formatCurrency(double value) => value == value.roundToDouble()
-    ? value.toStringAsFixed(0)
-    : value.toStringAsFixed(2);
+String _formatCurrency(double value) => value.round().toString();
 
 String _formatNumber(double value) => value == value.roundToDouble()
     ? value.toStringAsFixed(0)

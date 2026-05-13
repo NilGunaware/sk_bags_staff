@@ -248,12 +248,14 @@ def health() -> HealthResponse:
 def items(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, alias="pageSize", ge=1),
+    search: str = Query("", alias="search"),
     item_code: str = Query("", alias="itemCode"),
     item_name: str = Query("", alias="itemName"),
     qr_code: str = Query("", alias="qrCode"),
 ) -> ItemListResponse:
     pagination = normalize_pagination(page, page_size)
     result = list_items(
+        search=search,
         item_code=item_code,
         item_name=item_name,
         qr_code=qr_code,
@@ -264,6 +266,7 @@ def items(
         data=result["items"],
         pagination=build_pagination_meta(result["totalCount"], pagination.page, pagination.page_size),
         filters=ItemFilters(
+            search=search.strip(),
             itemCode=item_code.strip(),
             itemName=item_name.strip(),
             qrCode=qr_code.strip(),

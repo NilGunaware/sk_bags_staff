@@ -1,16 +1,21 @@
 import 'package:get/get.dart';
 
+import '../../core/services/local_item_sync_service.dart';
 import '../../core/services/order_service.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
 
 class OrderDetailController extends GetxController {
   final OrderService _orderService = Get.find<OrderService>();
+  final LocalItemSyncService _itemSyncService =
+      Get.find<LocalItemSyncService>();
 
   final order = Rxn<OrderSummaryModel>();
   final detail = Rxn<OrderDetailModel>();
   final isLoading = false.obs;
+  final isHydratingItems = false.obs;
   final errorMessage = RxnString();
+  final itemDetailWarnings = <String>[].obs;
   bool wasUpdated = false;
 
   @override
@@ -32,12 +37,70 @@ class OrderDetailController extends GetxController {
     isLoading.value = true;
     try {
       errorMessage.value = null;
-      detail.value = await _orderService.fetchOrderDetail(currentOrder.id);
+      itemDetailWarnings.clear();
+      final loadedDetail = await _orderService.fetchOrderDetail(
+        currentOrder.id,
+      );
+      detail.value = loadedDetail;
+      await hydrateItemDetails();
     } catch (error) {
       errorMessage.value = _friendlyOrderDetailMessage(error);
       ApiResponseHandler.showErrorSnackbar('Could not load order details');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> hydrateItemDetails() async {
+    final currentDetail = detail.value;
+    if (currentDetail == null || currentDetail.items.isEmpty) {
+      return;
+    }
+
+    isHydratingItems.value = true;
+    final warnings = <String>[];
+    final hydratedItems = <OrderItemModel>[];
+
+    try {
+      for (final item in currentDetail.items) {
+        final lookup = item.itemCode.trim().isNotEmpty
+            ? item.itemCode.trim()
+            : item.itemName.trim();
+        if (lookup.isEmpty) {
+          warnings.add('Could not load image for item without code.');
+          hydratedItems.add(item);
+          continue;
+        }
+
+        try {
+          final itemDetail = await _itemSyncService.fetchItemDetailByLookup(
+            lookup,
+          );
+          hydratedItems.add(item.copyWith(itemDetails: itemDetail));
+          warnings.addAll(itemDetail.warnings);
+        } catch (_) {
+          warnings.add(
+            'Image and live details unavailable for ${item.itemCode.isEmpty ? item.itemName : item.itemCode}.',
+          );
+          hydratedItems.add(item);
+        }
+      }
+
+      detail.value = OrderDetailModel(
+        summary: currentDetail.summary,
+        items: hydratedItems,
+        raw: currentDetail.raw,
+      );
+
+      final uniqueWarnings = <String>[];
+      for (final warning in warnings) {
+        if (!uniqueWarnings.contains(warning)) {
+          uniqueWarnings.add(warning);
+        }
+      }
+      itemDetailWarnings.assignAll(uniqueWarnings);
+    } finally {
+      isHydratingItems.value = false;
     }
   }
 

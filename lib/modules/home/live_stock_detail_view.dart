@@ -96,19 +96,9 @@ class LiveStockDetailView extends StatelessWidget {
               child: Column(
                 children: [
                   _DetailRow(label: 'Item Code', value: detail.itemCode),
-                  _DetailRow(
-                    label: 'QR Code',
-                    value: detail.qrCode?.isNotEmpty == true
-                        ? detail.qrCode!
-                        : detail.itemCode,
-                  ),
                   _DetailRow(label: 'Item Name', value: detail.itemName),
                   _DetailRow(label: 'Group', value: detail.itemGroup),
                   _DetailRow(label: 'HSN', value: detail.hsnCode ?? '-'),
-                  _DetailRow(
-                    label: 'Stock Value',
-                    value: _formatNumber(detail.totalQuantityValue),
-                  ),
                 ],
               ),
             ),
@@ -239,10 +229,7 @@ class _LiveStockHero extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     _HeroTag(label: 'Code ${detail.itemCode}'),
-                    _HeroTag(
-                      label:
-                          'QR ${(detail.qrCode?.isNotEmpty ?? false) ? detail.qrCode! : detail.itemCode}',
-                    ),
+
                     _HeroTag(label: 'HSN ${detail.hsnCode ?? '-'}'),
                   ],
                 ),
@@ -518,7 +505,7 @@ class _PriceRowCard extends StatelessWidget {
                 ),
               ),
               Text(
-                _formatNumber(price.finalPrice),
+                _formatPrice(price.finalPrice),
                 style: const TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w900,
@@ -589,6 +576,8 @@ class _EmptyCopy extends StatelessWidget {
 String _formatNumber(double value) => value == value.roundToDouble()
     ? value.toStringAsFixed(0)
     : value.toStringAsFixed(2);
+
+String _formatPrice(double value) => value.round().toString();
 
 List<ItemPriceModel> _visibleLiveStockPrices(List<ItemPriceModel> prices) {
   const order = <String>['A', 'W', 'C', 'H'];

@@ -109,7 +109,9 @@ class OrderCreateController extends GetxController {
             ? currentItem.itemCode.trim()
             : currentItem.itemName.trim();
         if (lookup.isEmpty) {
-          warnings.add('Could not load details for an order item without code.');
+          warnings.add(
+            'Could not load details for an order item without code.',
+          );
           continue;
         }
 
@@ -196,46 +198,44 @@ class OrderCreateController extends GetxController {
         .toList();
     selectedItems.assignAll(draftItems);
     cartItems.assignAll(
-      draftItems.map(
-        (item) {
-          final key = _draftKey(item.itemCode, item.itemName);
-          itemIdsByKey[key] = item.id;
-          if (item.itemCode.trim().isNotEmpty) {
-            itemIdsByKey[item.itemCode.trim()] = item.id;
+      draftItems.map((item) {
+        final key = _draftKey(item.itemCode, item.itemName);
+        itemIdsByKey[key] = item.id;
+        if (item.itemCode.trim().isNotEmpty) {
+          itemIdsByKey[item.itemCode.trim()] = item.id;
+        }
+        OrderItemModel? originalOrderItem;
+        for (final orderItem in detail.items) {
+          final sameId = item.id.isNotEmpty && orderItem.id == item.id;
+          final sameItem =
+              _draftKey(orderItem.itemCode, orderItem.itemName) == key;
+          if (sameId || sameItem) {
+            originalOrderItem = orderItem;
+            break;
           }
-          OrderItemModel? originalOrderItem;
-          for (final orderItem in detail.items) {
-            final sameId = item.id.isNotEmpty && orderItem.id == item.id;
-            final sameItem =
-                _draftKey(orderItem.itemCode, orderItem.itemName) == key;
-            if (sameId || sameItem) {
-              originalOrderItem = orderItem;
-              break;
-            }
-          }
-          final itemDetails = originalOrderItem?.itemDetails;
-          if (itemDetails != null) {
-            final availableWithCurrent =
-                itemDetails.availableOrderQuantity + item.quantity;
-            final safeAvailable = availableWithCurrent < item.quantity
-                ? item.quantity
-                : availableWithCurrent;
-            return CartItemModel.fromDetail(
-              itemDetails,
-              quantity: item.quantity,
-            ).copyWith(availableQuantity: safeAvailable);
-          }
-          return CartItemModel(
-            itemCode: item.itemCode,
-            itemName: item.itemName,
-            itemGroup: '',
+        }
+        final itemDetails = originalOrderItem?.itemDetails;
+        if (itemDetails != null) {
+          final availableWithCurrent =
+              itemDetails.availableOrderQuantity + item.quantity;
+          final safeAvailable = availableWithCurrent < item.quantity
+              ? item.quantity
+              : availableWithCurrent;
+          return CartItemModel.fromDetail(
+            itemDetails,
             quantity: item.quantity,
-            availableQuantity: 999999,
-            serverQuantities: const <String, double>{},
-            prices: const <ItemPriceModel>[],
-          );
-        },
-      ),
+          ).copyWith(availableQuantity: safeAvailable);
+        }
+        return CartItemModel(
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          itemGroup: '',
+          quantity: item.quantity,
+          availableQuantity: 999999,
+          serverQuantities: const <String, double>{},
+          prices: const <ItemPriceModel>[],
+        );
+      }),
     );
   }
 
@@ -278,15 +278,7 @@ class OrderCreateController extends GetxController {
   }
 
   int maxAllowedFor(MergedItemModel item, {DraftOrderItem? editing}) {
-    if (isEditMode &&
-        editing != null &&
-        item.totalQuantity <= editing.quantity) {
-      return 999999;
-    }
-
-    final alreadySelected = selectedQuantityFor(item);
-    final currentEditingQty = editing?.quantity ?? 0;
-    return item.totalQuantity - alreadySelected + currentEditingQty;
+    return 999999;
   }
 
   void upsertItem(
@@ -294,11 +286,8 @@ class OrderCreateController extends GetxController {
     int quantity, {
     DraftOrderItem? editing,
   }) {
-    final maxAllowed = maxAllowedFor(item, editing: editing);
-    if (quantity <= 0 || quantity > maxAllowed) {
-      ApiResponseHandler.showErrorSnackbar(
-        'Quantity must be between 1 and $maxAllowed',
-      );
+    if (quantity <= 0) {
+      ApiResponseHandler.showErrorSnackbar('Quantity must be greater than 0');
       return;
     }
 
@@ -352,34 +341,19 @@ class OrderCreateController extends GetxController {
   }
 
   void addCartItemFromDetail(MergedItemDetailModel detail, {int quantity = 1}) {
-    final maxAllowed = detail.availableOrderQuantity;
-    if (maxAllowed <= 0) {
-      ApiResponseHandler.showErrorSnackbar('No stock available for this item');
-      return;
-    }
+    final safeQuantity = quantity <= 0 ? 1 : quantity;
 
-    final incoming = CartItemModel.fromDetail(
-      detail,
-      quantity: quantity.clamp(1, maxAllowed).toInt(),
-    );
+    final incoming = CartItemModel.fromDetail(detail, quantity: safeQuantity);
     final existingIndex = cartItems.indexWhere(
       (item) => item.key == incoming.key,
     );
 
     if (existingIndex >= 0) {
       final existing = cartItems[existingIndex];
-      final existingLineKey = _draftKey(existing.itemCode, existing.itemName);
-      final hasExistingLine =
-          itemIdsByKey.containsKey(existingLineKey) ||
-          itemIdsByKey.containsKey(existing.itemCode.trim());
-      final preservedExistingQuantity = hasExistingLine ? existing.quantity : 0;
-      final allowed = maxAllowed + preservedExistingQuantity;
-      final updatedQuantity = (existing.quantity + quantity)
-          .clamp(1, allowed)
-          .toInt();
+      final updatedQuantity = existing.quantity + safeQuantity;
       cartItems[existingIndex] = existing.copyWith(
         quantity: updatedQuantity,
-        availableQuantity: allowed,
+        availableQuantity: detail.availableOrderQuantity,
         itemGroup: detail.itemGroup,
         qrCode: detail.qrCode,
         hsnCode: detail.hsnCode,
@@ -418,15 +392,10 @@ class OrderCreateController extends GetxController {
       }
     }
 
-    final availableWithCurrent = detail.availableOrderQuantity + current.quantity;
-    final safeAvailable = availableWithCurrent < current.quantity
-        ? current.quantity
-        : availableWithCurrent;
-
     cartItems[index] = CartItemModel.fromDetail(
       detail,
       quantity: current.quantity,
-    ).copyWith(availableQuantity: safeAvailable);
+    );
     cartItems.refresh();
   }
 
@@ -436,11 +405,8 @@ class OrderCreateController extends GetxController {
       return;
     }
 
-    final maxAllowed = item.availableQuantity <= 0
-        ? 999999
-        : item.availableQuantity;
-    final clamped = quantity.clamp(1, maxAllowed).toInt();
-    cartItems[index] = item.copyWith(quantity: clamped);
+    final safeQuantity = quantity <= 0 ? 1 : quantity;
+    cartItems[index] = item.copyWith(quantity: safeQuantity);
     cartItems.refresh();
     _syncDraftItemsFromCart();
   }
@@ -524,18 +490,16 @@ class OrderCreateController extends GetxController {
 
   void _syncDraftItemsFromCart() {
     selectedItems.assignAll(
-      cartItems.map(
-        (item) {
-          final key = _draftKey(item.itemCode, item.itemName);
-          return DraftOrderItem(
-            id: itemIdsByKey[key] ?? itemIdsByKey[item.itemCode.trim()] ?? '',
-            itemCode: item.itemCode,
-            itemName: item.itemName,
-            availableQuantity: item.availableQuantity,
-            quantity: item.quantity,
-          );
-        },
-      ),
+      cartItems.map((item) {
+        final key = _draftKey(item.itemCode, item.itemName);
+        return DraftOrderItem(
+          id: itemIdsByKey[key] ?? itemIdsByKey[item.itemCode.trim()] ?? '',
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          availableQuantity: item.availableQuantity,
+          quantity: item.quantity,
+        );
+      }),
     );
   }
 

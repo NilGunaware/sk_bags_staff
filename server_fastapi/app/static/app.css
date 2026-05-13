@@ -528,6 +528,17 @@ tbody tr.is-zero-stock:hover {
   min-height: 140px;
 }
 
+.item-detail-image-button {
+  display: block;
+  width: 140px;
+  height: 140px;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .item-detail-image {
   width: 140px;
   height: 140px;
@@ -543,6 +554,88 @@ tbody tr.is-zero-stock:hover {
   color: var(--muted);
   text-align: center;
   padding: 14px;
+}
+
+.item-thumb-button {
+  display: block;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.item-thumb {
+  display: block;
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid rgba(121, 91, 63, 0.12);
+  background: rgba(255, 251, 247, 0.96);
+}
+
+.item-thumb-empty {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 58px 24px 24px;
+  background: rgba(0, 0, 0, 0.92);
+}
+
+.image-preview-close {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  cursor: pointer;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.image-preview-copy {
+  position: fixed;
+  left: 24px;
+  right: 84px;
+  top: 24px;
+  color: white;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-preview-frame {
+  width: min(100%, 1100px);
+  height: min(82vh, 820px);
+  overflow: auto;
+  text-align: center;
+  cursor: zoom-in;
+}
+
+.image-preview-frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 18px;
 }
 
 .item-detail-copy {

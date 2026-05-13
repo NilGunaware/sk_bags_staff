@@ -28,6 +28,7 @@ class PaginationMeta(BaseModel):
 
 
 class ItemFilters(BaseModel):
+    search: str = ""
     itemCode: str
     itemName: str
     qrCode: str
@@ -49,6 +50,14 @@ class OrderItemFilters(BaseModel):
     itemName: str
 
 
+class ItemImageInfo(BaseModel):
+    available: bool
+    fileName: str | None = None
+    fileExtension: str | None = None
+    contentType: str | None = None
+    url: str | None = None
+
+
 class ItemSummary(BaseModel):
     itemMasterCode: int
     itemCode: str | None = None
@@ -63,20 +72,13 @@ class ItemSummary(BaseModel):
     priceCount: int = 0
     minFinalPrice: float | None = None
     maxFinalPrice: float | None = None
+    image: ItemImageInfo | None = None
 
 
 class ItemListResponse(BaseModel):
     data: list[ItemSummary]
     pagination: PaginationMeta
     filters: ItemFilters
-
-
-class ItemImageInfo(BaseModel):
-    available: bool
-    fileName: str | None = None
-    fileExtension: str | None = None
-    contentType: str | None = None
-    url: str | None = None
 
 
 class ItemPriceRow(BaseModel):

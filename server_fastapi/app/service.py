@@ -418,12 +418,15 @@ def ensure_order_schema() -> None:
         connection.commit()
 
 
-def list_items(*, item_code: str, item_name: str, qr_code: str, offset: int, page_size: int) -> dict[str, Any]:
+def list_items(*, search: str, item_code: str, item_name: str, qr_code: str, offset: int, page_size: int) -> dict[str, Any]:
     code_filter = _clean_text(qr_code) or _clean_text(item_code)
+    search_filter = _clean_text(search)
 
     params = {
         "item_code_pattern": _like_pattern(code_filter),
         "item_name_pattern": _like_pattern(item_name),
+        "search_filter": search_filter,
+        "search_pattern": _like_pattern(search_filter),
         "offset": offset,
         "page_size": page_size,
     }
@@ -433,7 +436,12 @@ def list_items(*, item_code: str, item_name: str, qr_code: str, offset: int, pag
     SELECT COUNT(*) AS totalCount
     FROM ItemBase
     WHERE itemCode LIKE %(item_code_pattern)s
-      AND itemName LIKE %(item_name_pattern)s;
+      AND itemName LIKE %(item_name_pattern)s
+      AND (
+        %(search_filter)s = ''
+        OR itemCode LIKE %(search_pattern)s
+        OR itemName LIKE %(search_pattern)s
+      );
     """
 
     data_sql = f"""
@@ -455,6 +463,11 @@ def list_items(*, item_code: str, item_name: str, qr_code: str, offset: int, pag
     FROM ItemBase
     WHERE itemCode LIKE %(item_code_pattern)s
       AND itemName LIKE %(item_name_pattern)s
+      AND (
+        %(search_filter)s = ''
+        OR itemCode LIKE %(search_pattern)s
+        OR itemName LIKE %(search_pattern)s
+      )
     ORDER BY itemName ASC, itemMasterCode ASC
     OFFSET %(offset)s ROWS FETCH NEXT %(page_size)s ROWS ONLY;
     """
@@ -465,6 +478,10 @@ def list_items(*, item_code: str, item_name: str, qr_code: str, offset: int, pag
         total_count = int(cursor.fetchone()[0])
         cursor.execute(data_sql, params)
         items = [_serialize_row(row) for row in rows_to_dicts(cursor)]
+
+    for item in items:
+        image, _image_path = _resolve_item_image(str(item.get("itemCode") or ""), [])
+        item["image"] = image
 
     return {"items": items, "totalCount": total_count, "qrCodeAvailable": True}
 

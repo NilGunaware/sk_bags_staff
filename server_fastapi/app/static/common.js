@@ -77,6 +77,14 @@
     }).format(number);
   }
 
+  function formatPrice(value) {
+    const number = Number(value || 0);
+    return new Intl.NumberFormat("en-IN", {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+    }).format(Math.round(number));
+  }
+
   function initializeShell(pageName) {
     document.querySelectorAll("[data-nav]").forEach((link) => {
       link.classList.toggle("is-active", link.dataset.nav === pageName);
@@ -189,13 +197,20 @@
       detail.image && detail.image.available && detail.image.url
         ? `
           <div class="item-detail-image-shell">
-            <img
-              class="item-detail-image"
-              src="${escapeAttribute(detail.image.url)}"
-              alt="${escapeAttribute(detail.itemName)}"
-              onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
-            />
-            <div class="item-detail-image item-detail-image--empty" style="display:none;">No image</div>
+            <button
+              class="item-detail-image-button"
+              type="button"
+              data-image-preview-url="${escapeAttribute(detail.image.url)}"
+              data-image-preview-title="${escapeAttribute(detail.itemName)}"
+            >
+              <img
+                class="item-detail-image"
+                src="${escapeAttribute(detail.image.url)}"
+                alt="${escapeAttribute(detail.itemName)}"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
+              />
+              <div class="item-detail-image item-detail-image--empty" style="display:none;">No image</div>
+            </button>
           </div>
         `
         : `
@@ -215,9 +230,9 @@
               <tr>
                 <td>${escapeHtml(price.categoryName)}</td>
                 <td>${escapeHtml(price.categoryCode)}</td>
-                <td>${formatNumber(price.basePrice)}</td>
+                <td>${formatPrice(price.basePrice)}</td>
                 <td>${formatNumber(price.discountPercent)}%</td>
-                <td>${formatNumber(price.finalPrice)}</td>
+                <td>${formatPrice(price.finalPrice)}</td>
                 <td>${formatDate(price.effectiveDate)}</td>
               </tr>
             `,
@@ -229,11 +244,11 @@
       ? `
         <div class="detail-metric">
           <span>Ref D3</span>
-          <strong>${detail.referencePricing.valueD3 == null ? "-" : formatNumber(detail.referencePricing.valueD3)}</strong>
+          <strong>${detail.referencePricing.valueD3 == null ? "-" : formatPrice(detail.referencePricing.valueD3)}</strong>
         </div>
         <div class="detail-metric">
           <span>Ref D5</span>
-          <strong>${detail.referencePricing.valueD5 == null ? "-" : formatNumber(detail.referencePricing.valueD5)}</strong>
+          <strong>${detail.referencePricing.valueD5 == null ? "-" : formatPrice(detail.referencePricing.valueD5)}</strong>
         </div>
         <div class="detail-metric">
           <span>Ref Date</span>
@@ -303,11 +318,11 @@
           </div>
           <div class="detail-metric">
             <span>Min Final Price</span>
-            <strong>${detail.minFinalPrice == null ? "-" : formatNumber(detail.minFinalPrice)}</strong>
+            <strong>${detail.minFinalPrice == null ? "-" : formatPrice(detail.minFinalPrice)}</strong>
           </div>
           <div class="detail-metric">
             <span>Max Final Price</span>
-            <strong>${detail.maxFinalPrice == null ? "-" : formatNumber(detail.maxFinalPrice)}</strong>
+            <strong>${detail.maxFinalPrice == null ? "-" : formatPrice(detail.maxFinalPrice)}</strong>
           </div>
           ${referencePricing}
         </div>
@@ -409,16 +424,54 @@
       return "-";
     }
     if (minFinalPrice == null) {
-      return formatNumber(maxFinalPrice);
+      return formatPrice(maxFinalPrice);
     }
     if (maxFinalPrice == null) {
-      return formatNumber(minFinalPrice);
+      return formatPrice(minFinalPrice);
     }
     if (Number(minFinalPrice) === Number(maxFinalPrice)) {
-      return formatNumber(minFinalPrice);
+      return formatPrice(minFinalPrice);
     }
-    return `${formatNumber(minFinalPrice)} - ${formatNumber(maxFinalPrice)}`;
+    return `${formatPrice(minFinalPrice)} - ${formatPrice(maxFinalPrice)}`;
   }
+
+  function openImagePreview(url, title = "Image") {
+    if (!url) {
+      return;
+    }
+
+    document.querySelector(".image-preview-overlay")?.remove();
+    const overlay = document.createElement("div");
+    overlay.className = "image-preview-overlay";
+    overlay.innerHTML = `
+      <button class="image-preview-close" type="button" aria-label="Close image preview">×</button>
+      <div class="image-preview-copy">${escapeHtml(title)}</div>
+      <div class="image-preview-frame">
+        <img src="${escapeAttribute(url)}" alt="${escapeAttribute(title)}" />
+      </div>
+    `;
+
+    overlay.addEventListener("click", (event) => {
+      if (
+        event.target === overlay ||
+        event.target.closest(".image-preview-close")
+      ) {
+        overlay.remove();
+      }
+    });
+    document.body.appendChild(overlay);
+  }
+
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-image-preview-url]");
+    if (!trigger) {
+      return;
+    }
+    openImagePreview(
+      trigger.dataset.imagePreviewUrl,
+      trigger.dataset.imagePreviewTitle || "Image",
+    );
+  });
 
   window.SKBags = {
     apiRequest,
@@ -428,7 +481,9 @@
     formatDate,
     formatDateTime,
     formatNumber,
+    formatPrice,
     formatPriceRange,
+    openImagePreview,
     initializeShell,
     getDraft,
     setDraft,

@@ -170,6 +170,7 @@ class LocalItemSyncService extends GetxService {
         final item = MergedItemModel.fromServerJson(
           itemJson,
           serverName: result.serverName,
+          baseUrl: result.baseUrl,
         );
 
         if (item.itemCode.trim().isEmpty && item.itemName.trim().isEmpty) {
@@ -306,6 +307,7 @@ class LocalItemSyncService extends GetxService {
 
     return _ServerItemBatch(
       serverName: server.name,
+      baseUrl: server.baseUrl,
       items: items,
       hasMore: hasMore,
       isReachable: isReachable,
@@ -581,6 +583,7 @@ class LocalItemSyncService extends GetxService {
     }
 
     return <Map<String, String>>[
+      <String, String>{...base, 'search': trimmedQuery},
       <String, String>{...base, 'itemCode': trimmedQuery},
       <String, String>{...base, 'itemName': trimmedQuery},
     ];
@@ -681,12 +684,14 @@ class _LocalServerConfig {
 class _ServerItemBatch {
   const _ServerItemBatch({
     required this.serverName,
+    required this.baseUrl,
     required this.items,
     required this.hasMore,
     required this.isReachable,
   });
 
   final String serverName;
+  final String baseUrl;
   final List<Map<String, dynamic>> items;
   final bool hasMore;
   final bool isReachable;

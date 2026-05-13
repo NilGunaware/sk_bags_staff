@@ -3,10 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/services/permission_service.dart';
 import '../../data/models/order_models.dart';
-import '../../routes/app_routes.dart';
 import '../home/fallback_network_image.dart';
+import '../home/searchable_item_lookup_sheet.dart';
 import 'order_create_controller.dart';
 
 class OrderCreateView extends GetView<OrderCreateController> {
@@ -112,12 +111,10 @@ class OrderCreateView extends GetView<OrderCreateController> {
                               item.quantity - 1,
                             )
                           : null,
-                      onIncrease: item.quantity < item.availableQuantity
-                          ? () => controller.updateCartItemQuantity(
-                              item,
-                              item.quantity + 1,
-                            )
-                          : null,
+                      onIncrease: () => controller.updateCartItemQuantity(
+                        item,
+                        item.quantity + 1,
+                      ),
                       onQuantityChanged: (quantity) =>
                           controller.updateCartItemQuantity(item, quantity),
                       onRemove: () => controller.removeCartItem(item),
@@ -143,7 +140,10 @@ class OrderCreateView extends GetView<OrderCreateController> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _OrderLookupSheet(),
+      builder: (_) => const SearchableItemLookupSheet(
+        title: 'Add Order Item',
+        subtitle: 'Search by item code/name or scan QR to add an item.',
+      ),
     );
 
     if (lookup == null || lookup.trim().isEmpty) {
@@ -469,7 +469,7 @@ class _OrderCartItemCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Price ${_formatAmount(selectedPrice.finalPrice)} • ${hasOpenLimit ? 'Editable qty' : 'Available ${item.availableQuantity}'}',
+                      'Price ${_formatAmount(selectedPrice.finalPrice)} • Stock ${hasOpenLimit ? 'not checked' : item.availableQuantity}',
                       style: const TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,
@@ -494,7 +494,6 @@ class _OrderCartItemCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   child: _OrderCartQuantityInput(
                     quantity: item.quantity,
-                    maxQuantity: item.availableQuantity,
                     onChanged: onQuantityChanged,
                   ),
                 ),
@@ -519,12 +518,10 @@ class _OrderCartItemCard extends StatelessWidget {
 class _OrderCartQuantityInput extends StatefulWidget {
   const _OrderCartQuantityInput({
     required this.quantity,
-    required this.maxQuantity,
     required this.onChanged,
   });
 
   final int quantity;
-  final int maxQuantity;
   final ValueChanged<int> onChanged;
 
   @override
@@ -584,8 +581,7 @@ class _OrderCartQuantityInputState extends State<_OrderCartQuantityInput> {
   }
 
   void _applyQuantity(int parsed) {
-    final maxQuantity = widget.maxQuantity <= 0 ? 999999 : widget.maxQuantity;
-    final clamped = parsed.clamp(1, maxQuantity).toInt();
+    final clamped = parsed <= 0 ? 1 : parsed;
     _setText(clamped.toString());
     if (clamped != widget.quantity) {
       widget.onChanged(clamped);
@@ -862,7 +858,11 @@ class _EmptyCartCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(Icons.shopping_cart_outlined, color: Colors.grey.shade400, size: 40),
+          Icon(
+            Icons.shopping_cart_outlined,
+            color: Colors.grey.shade400,
+            size: 40,
+          ),
           const SizedBox(height: 10),
           const Text(
             'No items added',
@@ -922,139 +922,6 @@ class _InlineBanner extends StatelessWidget {
   }
 }
 
-class _OrderLookupSheet extends StatefulWidget {
-  const _OrderLookupSheet();
-
-  @override
-  State<_OrderLookupSheet> createState() => _OrderLookupSheetState();
-}
-
-class _OrderLookupSheetState extends State<_OrderLookupSheet> {
-  late final TextEditingController inputController;
-
-  @override
-  void initState() {
-    super.initState();
-    inputController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    inputController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _scanWithCamera() async {
-    final ok = await PermissionService.instance.ensureCameraPermission();
-    if (!ok) {
-      Get.snackbar(
-        '',
-        'Camera permission is required to scan QR code.',
-        snackPosition: SnackPosition.TOP,
-      );
-      return;
-    }
-
-    final value = await Get.toNamed(Routes.scanner);
-    if (!mounted || value is! String || value.trim().isEmpty) {
-      return;
-    }
-    Navigator.of(context).pop(_normalizeLookupValue(value));
-  }
-
-  void _submitManual() {
-    final value = _normalizeLookupValue(inputController.text);
-    if (value.isEmpty) {
-      return;
-    }
-    Navigator.of(context).pop(value);
-  }
-
-  String _normalizeLookupValue(String value) {
-    return value.replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), '').trim();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Scan QR or Enter Code',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Use camera scan or type item code manually.',
-                style: TextStyle(color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _scanWithCamera,
-                  icon: const Icon(Icons.qr_code_scanner_outlined),
-                  label: const Text('Scan With Camera'),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: inputController,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) => _submitManual(),
-                decoration: _softInputDecoration(
-                  labelText: 'QR Code / Item Code',
-                  hintText: 'Enter QR or item code',
-                  prefixIcon: const Icon(Icons.qr_code_2_outlined),
-                ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _submitManual,
-                  icon: const Icon(Icons.search),
-                  label: const Text('Search Item'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 InputDecoration _softInputDecoration({
   required String labelText,
   required String hintText,
@@ -1082,9 +949,4 @@ InputDecoration _softInputDecoration({
   );
 }
 
-String _formatAmount(double value) {
-  if (value == value.roundToDouble()) {
-    return value.toStringAsFixed(0);
-  }
-  return value.toStringAsFixed(2);
-}
+String _formatAmount(double value) => value.round().toString();

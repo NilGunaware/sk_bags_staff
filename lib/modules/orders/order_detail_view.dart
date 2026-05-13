@@ -18,8 +18,8 @@ class OrderDetailView extends GetView<OrderDetailController> {
     }
 
     final result = await Get.toNamed(Routes.orderCreate, arguments: detail);
-    final updated = result == true ||
-        (result is Map && result['updated'] == true);
+    final updated =
+        result == true || (result is Map && result['updated'] == true);
     if (!updated) {
       return;
     }
@@ -55,7 +55,8 @@ class OrderDetailView extends GetView<OrderDetailController> {
           actions: [
             Obx(() {
               final canEdit =
-                  controller.detail.value != null && !controller.isLoading.value;
+                  controller.detail.value != null &&
+                  !controller.isLoading.value;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: TextButton.icon(
@@ -104,6 +105,28 @@ class OrderDetailView extends GetView<OrderDetailController> {
                   const SizedBox(height: 14),
                   _InformationCard(summary: summary),
                   const SizedBox(height: 14),
+                  if (controller.isHydratingItems.value) ...[
+                    const _InlineBanner(
+                      icon: Icons.image_search_outlined,
+                      message:
+                          'Loading item images, prices, and live details...',
+                      color: AppColors.primary,
+                      backgroundColor: Color(0xFFEFF3FF),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (controller.itemDetailWarnings.isNotEmpty) ...[
+                    for (final warning in controller.itemDetailWarnings) ...[
+                      _InlineBanner(
+                        icon: Icons.info_outline,
+                        message: warning,
+                        color: Colors.orange.shade800,
+                        backgroundColor: Colors.orange.shade50,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 6),
+                  ],
                   if (controller.errorMessage.value != null &&
                       detail == null) ...[
                     _InlineBanner(
@@ -486,7 +509,8 @@ class _ItemsCard extends StatelessWidget {
           ? const _DetailEmptyState(
               icon: Icons.inventory_2_outlined,
               title: 'No item lines',
-              subtitle: 'The remote API did not return item rows for this order.',
+              subtitle:
+                  'The remote API did not return item rows for this order.',
             )
           : Column(
               children: [
@@ -712,7 +736,7 @@ class _PriceBadge extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            _formatNumber(price.finalPrice),
+            _formatPrice(price.finalPrice),
             style: const TextStyle(
               color: AppColors.primary,
               fontSize: 14,
@@ -784,10 +808,7 @@ class _SurfaceCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 12),
-                trailing!,
-              ],
+              if (trailing != null) ...[const SizedBox(width: 12), trailing!],
             ],
           ),
           const SizedBox(height: 16),
@@ -884,11 +905,14 @@ class _DetailEmptyState extends StatelessWidget {
 }
 
 List<ItemPriceModel> _visiblePrices(List<ItemPriceModel> prices) {
-  final visible = prices.where((price) => price.isPrimaryBusinessPrice).toList();
+  final visible = prices
+      .where((price) => price.isPrimaryBusinessPrice)
+      .toList();
   final source = visible.isEmpty ? prices.take(4).toList() : visible;
   const order = <String>['A', 'W', 'C', 'H'];
   source.sort(
-    (a, b) => order.indexOf(a.displayCode).compareTo(order.indexOf(b.displayCode)),
+    (a, b) =>
+        order.indexOf(a.displayCode).compareTo(order.indexOf(b.displayCode)),
   );
   return source.take(4).toList();
 }
@@ -904,3 +928,5 @@ String _formatNumber(num value) {
   }
   return value.toStringAsFixed(2);
 }
+
+String _formatPrice(num value) => value.round().toString();

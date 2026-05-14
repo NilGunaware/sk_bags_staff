@@ -136,14 +136,10 @@ class OrderCreateView extends GetView<OrderCreateController> {
   }
 
   Future<void> _openLookupSheet(BuildContext context) async {
-    final lookup = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const SearchableItemLookupSheet(
-        title: 'Add Order Item',
-        subtitle: 'Search by item code/name or scan QR to add an item.',
-      ),
+    final lookup = await SearchableItemLookupSheet.open(
+      context,
+      title: 'Add Order Item',
+      subtitle: 'Search by item code/name or scan QR to add an item.',
     );
 
     if (lookup == null || lookup.trim().isEmpty) {

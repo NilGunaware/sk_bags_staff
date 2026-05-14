@@ -479,11 +479,67 @@ def list_items(*, search: str, item_code: str, item_name: str, qr_code: str, off
         cursor.execute(data_sql, params)
         items = [_serialize_row(row) for row in rows_to_dicts(cursor)]
 
+        support_codes_by_item = _load_support_codes_for_items(
+            cursor,
+            [int(item.get("itemMasterCode") or 0) for item in items],
+        )
+
     for item in items:
-        image, _image_path = _resolve_item_image(str(item.get("itemCode") or ""), [])
+        support_codes = support_codes_by_item.get(
+            int(item.get("itemMasterCode") or 0),
+            [],
+        )
+        image, _image_path = _resolve_item_image(
+            str(item.get("itemCode") or ""),
+            support_codes,
+        )
         item["image"] = image
 
     return {"items": items, "totalCount": total_count, "qrCodeAvailable": True}
+
+
+def _load_support_codes_for_items(
+    cursor: Any,
+    item_master_codes: list[int],
+) -> dict[int, list[str]]:
+    codes = sorted({code for code in item_master_codes if code > 0})
+    if not codes:
+        return {}
+
+    params = {f"code_{index}": code for index, code in enumerate(codes)}
+    placeholders = ", ".join(f"%({key})s" for key in params)
+    cursor.execute(
+        f"""
+        SELECT
+            MasterCode,
+            C1,
+            SrNo
+        FROM dbo.MasterSupport
+        WHERE MasterType = 6
+          AND MasterCode IN ({placeholders})
+          AND NULLIF(C1, '') IS NOT NULL
+        ORDER BY MasterCode ASC, SrNo ASC;
+        """,
+        params,
+    )
+
+    support_codes_by_item: dict[int, list[str]] = {}
+    seen_by_item: dict[int, set[str]] = {}
+    for row in rows_to_dicts(cursor):
+        master_code = int(row.get("MasterCode") or 0)
+        support_code = _clean_text(row.get("C1"))
+        if master_code <= 0 or not support_code:
+            continue
+
+        seen = seen_by_item.setdefault(master_code, set())
+        normalized = support_code.lower()
+        if normalized in seen:
+            continue
+
+        seen.add(normalized)
+        support_codes_by_item.setdefault(master_code, []).append(support_code)
+
+    return support_codes_by_item
 
 
 def find_item_reference(

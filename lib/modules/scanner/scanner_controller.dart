@@ -6,20 +6,15 @@ class ScannerController extends GetxController {
   final MobileScannerController cameraController = MobileScannerController();
   final RxBool isScanning = true.obs;
 
-  void onDetect(BarcodeCapture capture) {
+  void onDetect(BuildContext context, BarcodeCapture capture) {
     if (!isScanning.value) return;
 
     final barcodes = capture.barcodes;
-    final value =
-    barcodes.isNotEmpty ? (barcodes.first.rawValue ?? '') : '';
+    final value = barcodes.isNotEmpty ? (barcodes.first.rawValue ?? '') : '';
 
     if (value.isNotEmpty) {
       isScanning.value = false;
-
-      final context = Get.context;
-      if (context != null) {
-        Navigator.of(context).pop(value);
-      }
+      Navigator.of(context).pop(value);
     }
   }
 

@@ -40,7 +40,7 @@ class HomeView extends GetView<HomeController> {
                 clipBehavior: Clip.none,
                 children: [
                   IconButton(
-                    onPressed: () => _openCartScreen(),
+                    onPressed: () => _openCartScreen(context),
                     icon: const Icon(
                       Icons.shopping_cart_outlined,
                       color: Colors.white,
@@ -118,7 +118,8 @@ class HomeView extends GetView<HomeController> {
                   ),
                   children: [
                     _QuickActionsCard(
-                      onScanQr: () => _openCartScreen(startWithScanner: true),
+                      onScanQr: () =>
+                          _openCartScreen(context, startWithScanner: true),
                       onOrders: () => Get.toNamed(Routes.orders),
                     ),
                     const SizedBox(height: 16),
@@ -738,24 +739,23 @@ class HomeView extends GetView<HomeController> {
 
   Future<void> _openLiveStockLookupSheet(BuildContext context) async {
     final detail = await _resolveLookupDetail(context);
-    if (detail == null) {
+    if (detail == null || !context.mounted) {
       return;
     }
 
-    Get.to(() => LiveStockDetailView(detail: detail));
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => LiveStockDetailView(detail: detail)),
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   Future<MergedItemDetailModel?> _resolveLookupDetail(
     BuildContext context,
   ) async {
-    final value = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const SearchableItemLookupSheet(
-        title: 'Find Live Stock Item',
-        subtitle: 'Search item code/name or scan QR to view live stock.',
-      ),
+    final value = await SearchableItemLookupSheet.open(
+      context,
+      title: 'Find Live Stock Item',
+      subtitle: 'Search item code/name or scan QR to view live stock.',
     );
 
     if (value == null || value.trim().isEmpty) {
@@ -766,13 +766,19 @@ class HomeView extends GetView<HomeController> {
     return detail;
   }
 
-  Future<void> _openCartScreen({bool startWithScanner = false}) async {
-    await Get.to<void>(
-      () => _CartScreen(
-        controller: controller,
-        startWithScanner: startWithScanner,
+  Future<void> _openCartScreen(
+    BuildContext context, {
+    bool startWithScanner = false,
+  }) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => _CartScreen(
+          controller: controller,
+          startWithScanner: startWithScanner,
+        ),
       ),
     );
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   Widget _resultInfoTile(IconData icon, String label, dynamic value) {
@@ -1583,14 +1589,10 @@ class _CartScreenState extends State<_CartScreen> {
       return;
     }
 
-    final value = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const SearchableItemLookupSheet(
-        title: 'Add Billing Item',
-        subtitle: 'Search item code/name or scan QR to add to cart.',
-      ),
+    final value = await SearchableItemLookupSheet.open(
+      context,
+      title: 'Add Billing Item',
+      subtitle: 'Search item code/name or scan QR to add to cart.',
     );
 
     if (value == null || value.trim().isEmpty) {
@@ -1599,7 +1601,12 @@ class _CartScreenState extends State<_CartScreen> {
 
     final detail = await widget.controller.fetchItemDetailByLookup(value);
     if (detail != null && mounted) {
-      await Get.to(() => ScannedItemDetailView(detail: detail));
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ScannedItemDetailView(detail: detail),
+        ),
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
     }
   }
 

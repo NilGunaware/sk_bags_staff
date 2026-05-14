@@ -20,6 +20,41 @@ class SearchableItemLookupSheet extends StatefulWidget {
   final String title;
   final String subtitle;
 
+  static const String cameraScanRequest = '__camera_scan_request__';
+
+  static Future<String?> open(
+    BuildContext context, {
+    String title = 'Search Item',
+    String subtitle = 'Search by item code or item name, or scan QR.',
+  }) async {
+    final value = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          SearchableItemLookupSheet(title: title, subtitle: subtitle),
+    );
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    final normalized = normalizeLookupValue(value ?? '');
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    if (normalized == cameraScanRequest) {
+      // Let the modal sheet finish removing its barrier before opening camera.
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      final scannedValue = await Get.toNamed(Routes.scanner);
+      return normalizeLookupValue(scannedValue?.toString() ?? '');
+    }
+
+    return normalized;
+  }
+
+  static String normalizeLookupValue(String value) {
+    return value.replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), '').trim();
+  }
+
   @override
   State<SearchableItemLookupSheet> createState() =>
       _SearchableItemLookupSheetState();
@@ -154,15 +189,16 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
       return;
     }
 
-    final value = await Get.toNamed(Routes.scanner);
-    if (!mounted || value is! String || value.trim().isEmpty) {
+    if (!mounted) {
       return;
     }
-    _complete(value);
+    Navigator.of(context).pop(SearchableItemLookupSheet.cameraScanRequest);
   }
 
   void _submitTypedValue() {
-    final typedValue = _normalizeLookupValue(_queryController.text);
+    final typedValue = SearchableItemLookupSheet.normalizeLookupValue(
+      _queryController.text,
+    );
     if (typedValue.isEmpty) {
       return;
     }
@@ -177,15 +213,11 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
   }
 
   void _complete(String value) {
-    final normalized = _normalizeLookupValue(value);
+    final normalized = SearchableItemLookupSheet.normalizeLookupValue(value);
     if (normalized.isEmpty) {
       return;
     }
     Navigator.of(context).pop(normalized);
-  }
-
-  String _normalizeLookupValue(String value) {
-    return value.replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), '').trim();
   }
 
   @override

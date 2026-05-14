@@ -209,16 +209,22 @@ class MergedItemModel {
             baseUrl: baseUrl,
           )
         : null;
+    final rawImageUrls = json['imageUrls'] ?? json['image_urls'];
 
     return MergedItemModel(
       itemCode: (json['itemCode'] ?? json['item_code'] ?? '').toString(),
       itemName: (json['itemName'] ?? json['item_name'] ?? '').toString(),
       totalQuantity: quantity,
       serverQuantities: <String, int>{serverName: quantity},
-      imageUrls: <String>[
-        if ((image?.available ?? false) && (image?.url?.isNotEmpty ?? false))
-          image!.url!,
-      ],
+      imageUrls: _normalizeImageUrls(
+        baseUrl: baseUrl,
+        values: <dynamic>[
+          image?.url,
+          json['imageUrl'],
+          json['image_url'],
+          if (rawImageUrls is List) ...rawImageUrls,
+        ],
+      ),
       qrCode: _parseNullableString(json['qrCode'] ?? json['qr_code']),
     );
   }
@@ -712,6 +718,30 @@ double _parseDouble(dynamic value) {
 String? _parseNullableString(dynamic value) {
   final text = value?.toString().trim() ?? '';
   return text.isEmpty ? null : text;
+}
+
+List<String> _normalizeImageUrls({
+  required String baseUrl,
+  required Iterable<dynamic> values,
+}) {
+  final urls = <String>[];
+  final seen = <String>{};
+
+  for (final value in values) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) {
+      continue;
+    }
+
+    final resolved = raw.startsWith('/') && baseUrl.trim().isNotEmpty
+        ? '$baseUrl$raw'
+        : raw;
+    if (seen.add(resolved)) {
+      urls.add(resolved);
+    }
+  }
+
+  return urls;
 }
 
 PriceCategoryModel? _parseOrderPriceCategory(Map<String, dynamic> json) {

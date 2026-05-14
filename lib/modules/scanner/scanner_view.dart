@@ -19,7 +19,7 @@ class ScannerView extends GetView<ScannerController> {
         children: [
           MobileScanner(
             controller: controller.cameraController,
-            onDetect: controller.onDetect,
+            onDetect: (capture) => controller.onDetect(context, capture),
             errorBuilder: (context, error) {
               return Center(
                 child: Text(

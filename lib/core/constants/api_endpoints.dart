@@ -20,4 +20,9 @@ class ApiEndpoints {
   static const String orderStore = '/staff/order/store/0';
   static String orderStoreById(String orderId) => '/staff/order/store/$orderId';
   static const String orderDetail = '/staff/order/get_detail';
+  static const String repairRead = '/staff/repairing/read';
+  static const String repairStore = '/staff/repairing/store/0';
+  static String repairStoreById(String repairId) =>
+      '/staff/repairing/store/$repairId';
+  static const String repairDetail = '/staff/repairing/get_detail';
 }

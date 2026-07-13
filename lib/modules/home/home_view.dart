@@ -118,8 +118,7 @@ class HomeView extends GetView<HomeController> {
                   ),
                   children: [
                     _QuickActionsCard(
-                      onScanQr: () =>
-                          _openCartScreen(context, startWithScanner: true),
+                      onScanQr: () => _openCartScreen(context),
                       onOrders: () => Get.toNamed(Routes.orders),
                     ),
                     const SizedBox(height: 16),
@@ -129,19 +128,35 @@ class HomeView extends GetView<HomeController> {
                 );
               }
 
+              if (active == DashboardModule.liveStock) {
+                return _FeatureZone(
+                  title: 'Live Stock',
+                  subtitle:
+                      'Scan QR or enter a code to view complete item details, selected prices, and branch-wise live stock.',
+                  backgroundColor: const Color(0xFFF1F0FF),
+                  borderColor: const Color(0xFFC8C0FF),
+                  accentColor: const Color(0xFF4C1D95),
+                  headerTrailing: _CompactServerHealthStrip(
+                    controller: controller,
+                  ),
+                  children: [
+                    _LiveStockActionsCard(
+                      onLookup: () => _openLiveStockLookupSheet(context),
+                    ),
+                  ],
+                );
+              }
+
               return _FeatureZone(
-                title: 'Live Stock',
-                subtitle:
-                    'Scan QR or enter a code to view complete item details, selected prices, and branch-wise live stock.',
-                backgroundColor: const Color(0xFFF1F0FF),
-                borderColor: const Color(0xFFC8C0FF),
-                accentColor: const Color(0xFF4C1D95),
-                headerTrailing: _CompactServerHealthStrip(
-                  controller: controller,
-                ),
+                title: 'Repair',
+                subtitle: 'Create and track repair entries.',
+                backgroundColor: const Color(0xFFEFF6FF),
+                borderColor: const Color(0xFFBFDBFE),
+                accentColor: const Color(0xFF2563EB),
                 children: [
-                  _LiveStockActionsCard(
-                    onLookup: () => _openLiveStockLookupSheet(context),
+                  _RepairActionsCard(
+                    onCreate: () => Get.toNamed(Routes.repairCreate),
+                    onRepairs: () => Get.toNamed(Routes.repairs),
                   ),
                 ],
               );
@@ -156,12 +171,15 @@ class HomeView extends GetView<HomeController> {
     return Obx(() {
       final active = controller.activeDashboardModule.value;
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = (constraints.maxWidth - 10) / 2;
+          return Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Expanded(
+              SizedBox(
+                width: itemWidth,
                 child: _DashboardMenuButton(
                   title: 'Physical Stock',
                   icon: Icons.inventory_2_outlined,
@@ -172,8 +190,8 @@ class HomeView extends GetView<HomeController> {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
+              SizedBox(
+                width: itemWidth,
                 child: _DashboardMenuButton(
                   title: 'Billing',
                   icon: Icons.point_of_sale_outlined,
@@ -184,8 +202,8 @@ class HomeView extends GetView<HomeController> {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
+              SizedBox(
+                width: itemWidth,
                 child: _DashboardMenuButton(
                   title: 'Live Stock',
                   icon: Icons.stacked_bar_chart_outlined,
@@ -196,121 +214,21 @@ class HomeView extends GetView<HomeController> {
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
-      );
-    });
-  }
-
-  Widget _buildPriceCategoryCard() {
-    return Obx(() {
-      final allCategories = controller.priceCategories;
-      final categories = _billingPriceCategories(allCategories);
-      final selected = controller.selectedPriceCategory;
-      final isLoading = controller.isLoadingPriceCategories.value;
-      final error = controller.priceCategoryError.value;
-
-      return _SectionCard(
-        title: 'Pricing Category',
-        subtitle:
-            'Choose the active pricing title. The selected category price is used in item detail and cart.',
-        trailing: IconButton(
-          onPressed: isLoading
-              ? null
-              : () => controller.loadPriceCategories(refresh: true),
-          icon: isLoading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
+              SizedBox(
+                width: itemWidth,
+                child: _DashboardMenuButton(
+                  title: 'Repair',
+                  icon: Icons.home_repair_service_outlined,
+                  isSelected: active == DashboardModule.repair,
+                  selectedColor: const Color(0xFF2563EB),
+                  onTap: () => controller.setActiveDashboardModule(
+                    DashboardModule.repair,
                   ),
-                )
-              : const Icon(Icons.refresh, color: AppColors.primary),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (error != null && allCategories.isEmpty)
-              Text(
-                error,
-                style: const TextStyle(
-                  color: Color(0xFFB91C1C),
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            else if (categories.isEmpty)
-              const Text(
-                'Retail, Whoslesale, Corperate Gst Inclusive, and Franchise pricing categories are unavailable right now.',
-                style: TextStyle(color: Colors.grey),
-              )
-            else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: categories
-                      .map(
-                        (category) => Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: ChoiceChip(
-                            label: Text(category.displayName),
-                            selected:
-                                selected?.categoryNo == category.categoryNo,
-                            onSelected: (_) =>
-                                controller.selectPriceCategory(category),
-                            selectedColor: const Color(0xFF121212),
-                            backgroundColor: const Color(0xFFF6F6F6),
-                            labelStyle: TextStyle(
-                              color: selected?.categoryNo == category.categoryNo
-                                  ? Colors.white
-                                  : AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            side: BorderSide(
-                              color: selected?.categoryNo == category.categoryNo
-                                  ? AppColors.primary
-                                  : Colors.black12,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            if (selected != null) ...[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.sell_outlined, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${selected.displayName} selected',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.check_circle,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                  ],
                 ),
               ),
             ],
-          ],
-        ),
+          );
+        },
       );
     });
   }
@@ -766,17 +684,9 @@ class HomeView extends GetView<HomeController> {
     return detail;
   }
 
-  Future<void> _openCartScreen(
-    BuildContext context, {
-    bool startWithScanner = false,
-  }) async {
+  Future<void> _openCartScreen(BuildContext context) async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => _CartScreen(
-          controller: controller,
-          startWithScanner: startWithScanner,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => _CartScreen(controller: controller)),
     );
     FocusManager.instance.primaryFocus?.unfocus();
   }
@@ -1165,7 +1075,7 @@ class _QuickActionsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SectionCard(
       title: 'Quick Actions',
-      subtitle: 'Start scanning or open the order list directly.',
+      subtitle: 'Create an order or open the order list directly.',
       child: Row(
         children: [
           Expanded(
@@ -1216,6 +1126,46 @@ class _LiveStockActionsCard extends StatelessWidget {
                 foregroundColor: Colors.white,
                 minimumSize: const Size(0, 54),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RepairActionsCard extends StatelessWidget {
+  const _RepairActionsCard({required this.onCreate, required this.onRepairs});
+
+  final VoidCallback onCreate;
+  final VoidCallback onRepairs;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Repair Desk',
+      subtitle: 'Add a repair job with items, delivery date, and advance.',
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: onCreate,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Repair'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 54),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onRepairs,
+              icon: const Icon(Icons.list_alt_outlined),
+              label: const Text('Repair List'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 54)),
             ),
           ),
         ],
@@ -1327,12 +1277,13 @@ class _DashboardMenuButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(minHeight: 58),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? selectedColor.withValues(alpha: 0.12)
               : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected ? selectedColor : Colors.black12,
             width: isSelected ? 1.6 : 1,
@@ -1345,63 +1296,38 @@ class _DashboardMenuButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? selectedColor.withValues(alpha: 0.16)
-                        : const Color(0xFFF7F7F7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: selectedColor, size: 20),
-                ),
-                const Spacer(),
-                Icon(
-                  isSelected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                  size: 18,
-                  color: isSelected ? selectedColor : Colors.grey.shade400,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isSelected ? selectedColor : AppColors.primary,
-                fontSize: 13,
-                height: 1.2,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            Container(
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? selectedColor.withValues(alpha: 0.14)
-                    : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(999),
+                    ? selectedColor.withValues(alpha: 0.16)
+                    : const Color(0xFFF7F7F7),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: Icon(icon, color: selectedColor, size: 19),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
               child: Text(
-                isSelected ? 'Showing' : 'Open',
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isSelected ? selectedColor : Colors.grey.shade700,
-                  fontSize: 11,
+                  color: isSelected ? selectedColor : AppColors.primary,
+                  fontSize: 12,
+                  height: 1.12,
                   fontWeight: FontWeight.w800,
                 ),
               ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 16,
+              color: isSelected ? selectedColor : Colors.grey.shade400,
             ),
           ],
         ),
@@ -1547,10 +1473,9 @@ class _CompactServerHealthDot extends StatelessWidget {
 }
 
 class _CartScreen extends StatefulWidget {
-  const _CartScreen({required this.controller, required this.startWithScanner});
+  const _CartScreen({required this.controller});
 
   final HomeController controller;
-  final bool startWithScanner;
 
   @override
   State<_CartScreen> createState() => _CartScreenState();
@@ -1560,6 +1485,7 @@ class _CartScreenState extends State<_CartScreen> {
   late final TextEditingController partyNameController;
   late final TextEditingController partyMobileController;
   late final ScrollController scrollController;
+  bool _isClosing = false;
 
   @override
   void initState() {
@@ -1567,21 +1493,27 @@ class _CartScreenState extends State<_CartScreen> {
     partyNameController = TextEditingController();
     partyMobileController = TextEditingController();
     scrollController = ScrollController();
-    if (widget.startWithScanner) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _openCartLookupSheet();
-        }
-      });
-    }
   }
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     scrollController.dispose();
     partyNameController.dispose();
     partyMobileController.dispose();
     super.dispose();
+  }
+
+  Future<void> _closeCartScreen() async {
+    if (_isClosing) {
+      return;
+    }
+    _isClosing = true;
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _openCartLookupSheet() async {
@@ -1615,200 +1547,274 @@ class _CartScreenState extends State<_CartScreen> {
     final controller = widget.controller;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Scaffold(
-      backgroundColor: AppColors.scaffold,
-      appBar: AppBar(title: const Text('Create Order')),
-      body: SafeArea(
-        child: Obx(() {
-          final items = controller.cartService.items.toList();
-          final selectedCategory = controller.selectedPriceCategory;
-          final totalAmount = controller.cartTotalAmount;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _closeCartScreen();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.scaffold,
+        appBar: AppBar(
+          title: const Text('Create Order'),
+          leading: IconButton(
+            onPressed: _closeCartScreen,
+            icon: const Icon(Icons.arrow_back),
+          ),
+        ),
+        body: SafeArea(
+          child: Obx(() {
+            final items = controller.cartService.items.toList();
+            final selectedCategory = controller.selectedPriceCategory;
+            final totalAmount = controller.cartTotalAmount;
+            final isBusy =
+                controller.isLookingUpItem.value ||
+                controller.isLoadingPriceCategories.value ||
+                controller.isPlacingCartOrder.value;
 
-          return ListView(
-            controller: scrollController,
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              bottomInset > 0 ? bottomInset + 24 : 28,
-            ),
-            children: [
-              TextField(
-                controller: partyNameController,
-                textInputAction: TextInputAction.next,
-                scrollPadding: const EdgeInsets.only(bottom: 180),
-                decoration: InputDecoration(
-                  labelText: 'Party Name',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
+            return ListView(
+              controller: scrollController,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                bottomInset > 0 ? bottomInset + 24 : 28,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: partyMobileController,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.done,
-                scrollPadding: const EdgeInsets.only(bottom: 180),
-                decoration: InputDecoration(
-                  labelText: 'Mobile No',
-                  prefixIcon: const Icon(Icons.phone_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                selectedCategory == null
-                    ? 'No pricing category selected.'
-                    : 'Selected price: ${selectedCategory.displayName}',
-                style: TextStyle(color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 16),
-              _CartPriceSelector(
-                controller: controller,
-                selectedCategory: selectedCategory,
-              ),
-              _CartLookupButtonCard(
-                isLoading: controller.isLookingUpItem.value,
-                onTap: _openCartLookupSheet,
-              ),
-              const SizedBox(height: 16),
-              if (items.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.shopping_cart_outlined,
-                        color: Colors.grey.shade400,
-                        size: 40,
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Cart is empty',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tap "Add Item / Scan QR" to find items for this order.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey.shade700),
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                for (final item in items) ...[
-                  _CartItemCard(
-                    item: item,
-                    selectedPrice: item.priceFor(selectedCategory),
-                    onDecrease: item.quantity > 1
-                        ? () => controller.updateCartItemQuantity(
-                            item,
-                            item.quantity - 1,
-                          )
-                        : null,
-                    onIncrease: () => controller.updateCartItemQuantity(
-                      item,
-                      item.quantity + 1,
-                    ),
-                    onQuantityChanged: (quantity) =>
-                        controller.updateCartItemQuantity(item, quantity),
-                    onRemove: () => controller.removeCartItem(item),
+              children: [
+                if (isBusy) ...[
+                  _CartLoadingBanner(
+                    message: controller.isPlacingCartOrder.value
+                        ? 'Placing order...'
+                        : controller.isLookingUpItem.value
+                        ? 'Loading item details...'
+                        : 'Loading price categories...',
                   ),
                   const SizedBox(height: 12),
                 ],
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.black12),
+                TextField(
+                  controller: partyNameController,
+                  textInputAction: TextInputAction.next,
+                  scrollPadding: const EdgeInsets.only(bottom: 180),
+                  decoration: InputDecoration(
+                    labelText: 'Party Name',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      _CartTotalRow(
-                        label: 'Items',
-                        value: '${controller.cartCount}',
-                      ),
-                      const SizedBox(height: 10),
-                      _CartTotalRow(
-                        label: 'Total Qty',
-                        value: '${controller.cartTotalQuantity}',
-                      ),
-                      const SizedBox(height: 10),
-                      _CartTotalRow(
-                        label: 'Amount',
-                        value: _formatAmount(totalAmount),
-                        emphasized: true,
-                      ),
-                    ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: partyMobileController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 10,
+                  textInputAction: TextInputAction.done,
+                  scrollPadding: const EdgeInsets.only(bottom: 180),
+                  decoration: InputDecoration(
+                    labelText: 'Mobile No',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: controller.cartCount == 0
-                            ? null
-                            : controller.clearCart,
-                        child: const Text('Clear Cart'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: controller.isPlacingCartOrder.value
-                            ? null
-                            : () async {
-                                final placed = await controller.placeCartOrder(
-                                  partyName: partyNameController.text,
-                                  partyMobile: partyMobileController.text,
-                                );
-                                if (placed && context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                        child: controller.isPlacingCartOrder.value
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Place Order'),
-                      ),
-                    ),
-                  ],
+                Text(
+                  selectedCategory == null
+                      ? 'No pricing category selected.'
+                      : 'Selected price: ${selectedCategory.displayName}',
+                  style: TextStyle(color: Colors.grey.shade700),
                 ),
+                const SizedBox(height: 16),
+                _CartPriceSelector(
+                  controller: controller,
+                  selectedCategory: selectedCategory,
+                ),
+                _CartLookupButtonCard(
+                  isLoading: controller.isLookingUpItem.value,
+                  isDisabled: controller.isPlacingCartOrder.value,
+                  onTap: _openCartLookupSheet,
+                ),
+                const SizedBox(height: 16),
+                if (items.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.shopping_cart_outlined,
+                          color: Colors.grey.shade400,
+                          size: 40,
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Cart is empty',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tap "Add Item / Scan QR" to find items for this order.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  for (final item in items) ...[
+                    _CartItemCard(
+                      item: item,
+                      selectedPrice: item.priceFor(selectedCategory),
+                      onDecrease: item.quantity > 1
+                          ? () => controller.updateCartItemQuantity(
+                              item,
+                              item.quantity - 1,
+                            )
+                          : null,
+                      onIncrease: () => controller.updateCartItemQuantity(
+                        item,
+                        item.quantity + 1,
+                      ),
+                      onQuantityChanged: (quantity) =>
+                          controller.updateCartItemQuantity(item, quantity),
+                      onRemove: () => controller.removeCartItem(item),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: Column(
+                      children: [
+                        _CartTotalRow(
+                          label: 'Items',
+                          value: '${controller.cartCount}',
+                        ),
+                        const SizedBox(height: 10),
+                        _CartTotalRow(
+                          label: 'Total Qty',
+                          value: '${controller.cartTotalQuantity}',
+                        ),
+                        const SizedBox(height: 10),
+                        _CartTotalRow(
+                          label: 'Amount',
+                          value: _formatAmount(totalAmount),
+                          emphasized: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: controller.cartCount == 0
+                              ? null
+                              : controller.clearCart,
+                          child: const Text('Clear Cart'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: controller.isPlacingCartOrder.value
+                              ? null
+                              : () async {
+                                  final placed = await controller
+                                      .placeCartOrder(
+                                        partyName: partyNameController.text,
+                                        partyMobile: partyMobileController.text,
+                                      );
+                                  if (placed && context.mounted) {
+                                    await _closeCartScreen();
+                                  }
+                                },
+                          child: controller.isPlacingCartOrder.value
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Place Order'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
-            ],
-          );
-        }),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _CartLoadingBanner extends StatelessWidget {
+  const _CartLoadingBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _CartLookupButtonCard extends StatelessWidget {
-  const _CartLookupButtonCard({required this.isLoading, required this.onTap});
+  const _CartLookupButtonCard({
+    required this.isLoading,
+    required this.isDisabled,
+    required this.onTap,
+  });
 
   final bool isLoading;
+  final bool isDisabled;
   final VoidCallback onTap;
 
   @override
@@ -1840,7 +1846,7 @@ class _CartLookupButtonCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: isLoading ? null : onTap,
+              onPressed: isLoading || isDisabled ? null : onTap,
               icon: isLoading
                   ? const SizedBox(
                       width: 18,

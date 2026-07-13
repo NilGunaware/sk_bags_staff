@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import logging
 import os
 import queue
 import shutil
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -14,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 import tkinter as tk
-from tkinter import scrolledtext, ttk
+from tkinter import messagebox, scrolledtext, ttk
 
 import uvicorn
 from dotenv import dotenv_values
@@ -29,6 +33,7 @@ from app.db import assert_database_reachable_for_startup
 from app.main import app
 from app.runtime import env_example_path, env_path
 from app.service import ensure_order_schema
+from app.version import APP_VERSION, DEFAULT_UPDATE_MANIFEST_URL
 
 try:
     import psutil
@@ -39,6 +44,9 @@ except ImportError:  # pragma: no cover
 APP_TITLE = "SK Bags Desktop"
 LOCAL_HOST = "127.0.0.1"
 SERVER_HOST = "0.0.0.0"
+UPDATE_USER_AGENT = f"SKBagsDesktop/{APP_VERSION}"
+UPDATE_CHECK_TIMEOUT = 8.0
+UPDATE_DOWNLOAD_TIMEOUT = 120.0
 LICENSE_CHECK_URL = "https://interlinkpos.com/sk_bags/isactive"
 LICENSE_CHECK_TIMEOUT = 6.0
 LICENSE_IS_ACTIVE: bool | None = None
@@ -89,6 +97,75 @@ def refresh_license_status() -> tuple[bool, str]:
     return False, f"Unexpected licence response: {raw_value!r}. Contact to developer."
 
 
+def _version_parts(value: str) -> tuple[int, ...]:
+    cleaned = value.strip().lower().lstrip("v")
+    parts: list[int] = []
+    for piece in cleaned.replace("-", ".").split("."):
+        digits = "".join(character for character in piece if character.isdigit())
+        parts.append(int(digits or "0"))
+    return tuple(parts or [0])
+
+
+def _is_newer_version(candidate: str, current: str) -> bool:
+    candidate_parts = list(_version_parts(candidate))
+    current_parts = list(_version_parts(current))
+    width = max(len(candidate_parts), len(current_parts))
+    candidate_parts.extend([0] * (width - len(candidate_parts)))
+    current_parts.extend([0] * (width - len(current_parts)))
+    return tuple(candidate_parts) > tuple(current_parts)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _request_json(url: str, timeout: float) -> dict[str, object]:
+    request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        payload = response.read().decode("utf-8", errors="replace")
+    decoded = json.loads(payload)
+    if not isinstance(decoded, dict):
+        raise ValueError("Update manifest is not a JSON object.")
+    return decoded
+
+
+def _download_file(url: str, destination: Path) -> None:
+    request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
+    with urllib.request.urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT) as response:
+        with destination.open("wb") as output:
+            shutil.copyfileobj(response, output)
+
+
+def _running_executable_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve()
+    return Path(__file__).resolve()
+
+
+def _write_update_script(new_exe: Path, target_exe: Path, pid: int) -> Path:
+    script_path = Path(tempfile.gettempdir()) / f"skbags_update_{int(time.time())}.bat"
+    script = f"""@echo off
+setlocal
+timeout /t 2 /nobreak >nul
+taskkill /PID {pid} /T /F >nul 2>&1
+copy /Y "{new_exe}" "{target_exe}" >nul
+if errorlevel 1 (
+  echo Update failed. Could not replace executable.
+  pause
+  exit /b 1
+)
+start "" "{target_exe}"
+del "{new_exe}" >nul 2>&1
+del "%~f0" >nul 2>&1
+"""
+    script_path.write_text(script, encoding="utf-8")
+    return script_path
+
+
 class LocalEnvStore:
     KEY_ORDER = [
         "IS_DEBUG",
@@ -103,6 +180,8 @@ class LocalEnvStore:
         "DEFAULT_PAGE_SIZE",
         "MAX_PAGE_SIZE",
         "DEBUG",
+        "AUTO_UPDATE",
+        "UPDATE_MANIFEST_URL",
     ]
 
     CONFIG_KEYS = ["PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"]
@@ -169,6 +248,10 @@ class LocalEnvStore:
             values["DEFAULT_PAGE_SIZE"] = str(settings.default_page_size)
         if "MAX_PAGE_SIZE" not in values:
             values["MAX_PAGE_SIZE"] = str(settings.max_page_size)
+        if "AUTO_UPDATE" not in values:
+            values["AUTO_UPDATE"] = "true"
+        if "UPDATE_MANIFEST_URL" not in values:
+            values["UPDATE_MANIFEST_URL"] = DEFAULT_UPDATE_MANIFEST_URL
 
         lines: list[str] = []
         for key in self.KEY_ORDER:
@@ -459,6 +542,7 @@ class DesktopApp:
         self.env_store = LocalEnvStore()
         self.server_manager = ServerManager(self.log_queue)
         self.license_control_widgets: list[ttk.Widget] = []
+        self.is_update_check_running = False
 
         self.status_var = tk.StringVar(value="Preparing...")
         self.url_var = tk.StringVar(value=self.server_manager.base_url)
@@ -466,6 +550,8 @@ class DesktopApp:
         self.connection_note_var = tk.StringVar(value="")
         self.db_target_var = tk.StringVar(value="No saved database settings yet")
         self.api_toggle_text_var = tk.StringVar(value="Start API")
+        self.version_var = tk.StringVar(value=f"Version {APP_VERSION}")
+        self.update_status_var = tk.StringVar(value="Updates not checked")
 
         self.service_port_var = tk.StringVar()
         self.db_host_var = tk.StringVar()
@@ -479,6 +565,7 @@ class DesktopApp:
         self._check_license_status_on_start()
         self.root.protocol("WM_DELETE_WINDOW", self.stop_and_exit)
         self._maybe_autostart()
+        self.root.after(900, self._check_for_updates_on_start)
         self.root.after(120, self._drain_logs)
         self.root.after(350, self._refresh_status)
 
@@ -632,6 +719,7 @@ class DesktopApp:
             wraplength=420,
             justify="left",
         ).pack(anchor="w", pady=(6, 0))
+        ttk.Label(hero_copy, textvariable=self.version_var, style="HeroBody.TLabel").pack(anchor="w", pady=(6, 0))
 
         hero_stats = ttk.Frame(hero, style="Hero.TFrame")
         hero_stats.grid(row=0, column=1, sticky="nsew")
@@ -659,7 +747,7 @@ class DesktopApp:
 
         hero_button_row = ttk.Frame(hero, style="Hero.TFrame")
         hero_button_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 0))
-        for column in range(2):
+        for column in range(3):
             hero_button_row.columnconfigure(column, weight=1)
 
         home_button = ttk.Button(
@@ -671,13 +759,21 @@ class DesktopApp:
         home_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         self._register_license_widget(home_button)
 
+        self.update_button = ttk.Button(
+            hero_button_row,
+            text="Check Update",
+            style="Secondary.TButton",
+            command=lambda: self.check_for_updates(manual=True),
+        )
+        self.update_button.grid(row=0, column=1, sticky="ew", padx=6)
+
         self.api_toggle_button = ttk.Button(
             hero_button_row,
             textvariable=self.api_toggle_text_var,
             style="Primary.TButton",
             command=self.toggle_server,
         )
-        self.api_toggle_button.grid(row=0, column=1, sticky="ew", padx=(6, 0))
+        self.api_toggle_button.grid(row=0, column=2, sticky="ew", padx=(6, 0))
 
         left_column = ttk.Frame(shell, style="App.TFrame")
         left_column.grid(row=1, column=0, sticky="nsew", padx=(0, 12), pady=(12, 0))
@@ -753,6 +849,15 @@ class DesktopApp:
             justify="left",
         )
         self.connection_note_label.grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        self.update_status_label = ttk.Label(
+            connection_card,
+            textvariable=self.update_status_var,
+            style="Hint.TLabel",
+            wraplength=360,
+            justify="left",
+        )
+        self.update_status_label.grid(row=5, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
         monitor_card = ttk.Frame(right_column, padding=14, style="Card.TFrame")
         monitor_card.grid(row=0, column=0, sticky="ew")
@@ -980,6 +1085,164 @@ class DesktopApp:
             self.server_manager.status = "Config Required"
             self.connection_note_var.set("Enter DB settings and click Reconnect.")
             self.server_manager.log("No saved database settings found. Enter connection values and click Reconnect.")
+
+    def _check_for_updates_on_start(self) -> None:
+        values = self.env_store.load_values()
+        auto_update = _env_bool(values.get("AUTO_UPDATE"), True)
+        if auto_update:
+            self.check_for_updates(manual=False)
+
+    def _update_manifest_url(self) -> str:
+        values = self.env_store.load_values()
+        return (values.get("UPDATE_MANIFEST_URL") or DEFAULT_UPDATE_MANIFEST_URL).strip()
+
+    def check_for_updates(self, *, manual: bool) -> None:
+        if self.is_update_check_running:
+            if manual:
+                self.server_manager.log("Update check is already running.")
+            return
+
+        manifest_url = self._update_manifest_url()
+        if not manifest_url:
+            message = "Update manifest URL is not configured."
+            self.update_status_var.set(message)
+            if manual:
+                self.server_manager.log(message)
+            return
+
+        self.is_update_check_running = True
+        self.update_status_var.set("Checking for updates...")
+        self.update_button.state(["disabled"])
+
+        thread = threading.Thread(
+            target=self._check_for_updates_worker,
+            args=(manifest_url, manual),
+            daemon=True,
+        )
+        thread.start()
+
+    def _check_for_updates_worker(self, manifest_url: str, manual: bool) -> None:
+        try:
+            manifest = _request_json(manifest_url, timeout=UPDATE_CHECK_TIMEOUT)
+            latest_version = str(manifest.get("version") or "").strip()
+            download_url = str(manifest.get("url") or "").strip()
+            sha256 = str(manifest.get("sha256") or "").strip().lower()
+
+            if not latest_version or not download_url or not sha256:
+                raise ValueError("Update manifest must include version, url, and sha256.")
+
+            if not _is_newer_version(latest_version, APP_VERSION):
+                self.root.after(
+                    0,
+                    lambda: self._finish_update_check(
+                        f"Already latest version ({APP_VERSION})."
+                    ),
+                )
+                return
+
+            self.root.after(
+                0,
+                lambda: self._handle_update_available(
+                    latest_version=latest_version,
+                    download_url=download_url,
+                    sha256=sha256,
+                    manual=manual,
+                ),
+            )
+        except Exception as error:
+            message = f"Update check failed: {error}"
+            self.root.after(
+                0,
+                lambda: self._finish_update_check(message),
+            )
+
+    def _handle_update_available(
+        self,
+        *,
+        latest_version: str,
+        download_url: str,
+        sha256: str,
+        manual: bool,
+    ) -> None:
+        self.is_update_check_running = False
+        self.update_button.state(["!disabled"])
+        message = f"Update {latest_version} is available."
+        self.update_status_var.set(message)
+        self.server_manager.log(message)
+
+        should_install = True
+        if manual:
+            should_install = messagebox.askyesno(
+                "Update available",
+                f"Version {latest_version} is available.\n\nInstall now?",
+                parent=self.root,
+            )
+
+        if should_install:
+            self.install_update(latest_version, download_url, sha256)
+
+    def _finish_update_check(self, message: str) -> None:
+        self.is_update_check_running = False
+        self.update_button.state(["!disabled"])
+        self.update_status_var.set(message)
+        self.server_manager.log(message)
+
+    def install_update(self, latest_version: str, download_url: str, sha256: str) -> None:
+        self.update_status_var.set(f"Downloading update {latest_version}...")
+        self.update_button.state(["disabled"])
+        thread = threading.Thread(
+            target=self._install_update_worker,
+            args=(latest_version, download_url, sha256),
+            daemon=True,
+        )
+        thread.start()
+
+    def _install_update_worker(self, latest_version: str, download_url: str, sha256: str) -> None:
+        try:
+            target_exe = _running_executable_path()
+            if not getattr(sys, "frozen", False):
+                raise RuntimeError(
+                    "Updater can install only from the packaged Windows EXE."
+                )
+
+            download_path = Path(tempfile.gettempdir()) / f"SKBagsDesktop-{latest_version}.exe"
+            _download_file(download_url, download_path)
+            actual_sha256 = _sha256_file(download_path)
+            if actual_sha256.lower() != sha256.lower():
+                download_path.unlink(missing_ok=True)
+                raise RuntimeError("Downloaded update checksum did not match.")
+
+            script_path = _write_update_script(download_path, target_exe, os.getpid())
+            self.root.after(
+                0,
+                lambda: self._launch_update_script(script_path, latest_version),
+            )
+        except Exception as error:
+            message = f"Update install failed: {error}"
+            self.root.after(
+                0,
+                lambda: self._finish_update_check(message),
+            )
+
+    def _launch_update_script(self, script_path: Path, latest_version: str) -> None:
+        self.update_status_var.set(f"Installing update {latest_version}...")
+        self.server_manager.log(f"Installing update {latest_version}. The app will restart.")
+        try:
+            creation_flags = 0
+            if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+                creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+            if hasattr(subprocess, "DETACHED_PROCESS"):
+                creation_flags |= subprocess.DETACHED_PROCESS
+            subprocess.Popen(
+                ["cmd", "/c", str(script_path)],
+                creationflags=creation_flags,
+                close_fds=True,
+            )
+        except Exception as error:
+            self._finish_update_check(f"Could not launch updater: {error}")
+            return
+
+        self.stop_and_exit()
 
     def load_saved_settings(self) -> None:
         if LICENSE_IS_ACTIVE is not True:

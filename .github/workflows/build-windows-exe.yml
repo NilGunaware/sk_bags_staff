@@ -5,6 +5,14 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Desktop app version, for example 1.0.5"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   build-windows-exe:
@@ -30,12 +38,45 @@ jobs:
           python -m pip install -r desktop_requirements.txt
           cp .env.example .env
 
+      - name: Prepare release version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="1.0.${{ github.run_number }}"
+          fi
+          TAG="desktop-v${VERSION}"
+          MANIFEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/latest.json"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          printf 'APP_VERSION = "%s"\nDEFAULT_UPDATE_MANIFEST_URL = "%s"\n' "$VERSION" "$MANIFEST_URL" > server_fastapi/app/version.py
+          printf '\nAUTO_UPDATE=true\nUPDATE_MANIFEST_URL=%s\n' "$MANIFEST_URL" >> server_fastapi/.env.example
+
       - name: Build desktop package
         working-directory: server_fastapi
         run: pyinstaller --noconfirm --clean desktop_app.spec
+
+      - name: Generate update manifest
+        run: |
+          EXE_PATH="server_fastapi/dist/SKBagsDesktop.exe"
+          SHA256="$(sha256sum "$EXE_PATH" | awk '{print $1}')"
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.version.outputs.tag }}/SKBagsDesktop.exe"
+          printf '{\n  "version": "%s",\n  "url": "%s",\n  "sha256": "%s"\n}\n' "${{ steps.version.outputs.version }}" "$DOWNLOAD_URL" "$SHA256" > server_fastapi/dist/latest.json
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: SKBagsDesktop-windows
-          path: server_fastapi/dist/SKBagsDesktop.exe
+          path: |
+            server_fastapi/dist/SKBagsDesktop.exe
+            server_fastapi/dist/latest.json
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: SK Bags Desktop ${{ steps.version.outputs.version }}
+          make_latest: true
+          files: |
+            server_fastapi/dist/SKBagsDesktop.exe
+            server_fastapi/dist/latest.json

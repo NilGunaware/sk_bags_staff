@@ -115,6 +115,7 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Map<String, String>? fields,
     Map<String, String>? filePaths,
+    List<MapEntry<String, String>>? filePathEntries,
   }) async {
     var uri = Uri.parse('${ApiEndpoints.baseUrl}$endpoint');
     if (queryParams != null && queryParams.isNotEmpty) {
@@ -144,6 +145,13 @@ class HttpClient {
           );
         }
       }
+      if (filePathEntries != null && filePathEntries.isNotEmpty) {
+        for (final entry in filePathEntries) {
+          request.files.add(
+            await http.MultipartFile.fromPath(entry.key, entry.value),
+          );
+        }
+      }
 
       _logApiRequest(
         'POST',
@@ -151,6 +159,16 @@ class HttpClient {
         body: <String, dynamic>{
           'fields': fields ?? <String, String>{},
           'files': filePaths ?? <String, String>{},
+          'fileEntries':
+              filePathEntries
+                  ?.map(
+                    (entry) => <String, String>{
+                      'field': entry.key,
+                      'path': entry.value,
+                    },
+                  )
+                  .toList() ??
+              const <Map<String, String>>[],
         },
       );
       final http.StreamedResponse streamedResponse;

@@ -32,10 +32,7 @@ class OrderCreateView extends GetView<OrderCreateController> {
               submitLabel: controller.submitLabel,
               submittingLabel: controller.submittingLabel,
               preparingLabel: controller.preparingLabel,
-              onSubmit:
-                  controller.isPreparing.value || controller.isSubmitting.value
-                  ? null
-                  : controller.submit,
+              onSubmit: controller.isPreparing.value || controller.isSubmitting.value ? null : controller.submit,
             ),
           ),
         ),
@@ -49,53 +46,18 @@ class OrderCreateView extends GetView<OrderCreateController> {
 
             return ListView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                bottomInset > 0 ? bottomInset + 150 : 150,
-              ),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset > 0 ? bottomInset + 150 : 150),
               children: [
-                _OrderCartHero(
-                  title: controller.heroTitle,
-                  entryNo: controller.nextEntryNo.value,
-                  entryDate: controller.displayEntryDate,
-                  lineCount: controller.lineCount,
-                  totalQuantity: controller.totalQuantity,
-                  totalAmount: controller.totalAmount,
-                ),
+                _OrderCartHero(title: controller.heroTitle, entryNo: controller.nextEntryNo.value, entryDate: controller.displayEntryDate, lineCount: controller.lineCount, totalQuantity: controller.totalQuantity, totalAmount: controller.totalAmount),
                 const SizedBox(height: 16),
                 _PartyCard(controller: controller),
                 const SizedBox(height: 16),
-                _PriceSelector(
-                  categories: controller.priceCategories,
-                  selectedCategory: selectedCategory,
-                  onSelected: controller.selectPriceCategory,
-                ),
-                _LookupCard(
-                  isLoading: controller.isLookingUpItem.value,
-                  onTap: () => _openLookupSheet(context),
-                ),
+                _PriceSelector(categories: controller.priceCategories, selectedCategory: selectedCategory, onSelected: controller.selectPriceCategory),
+                _LookupCard(isLoading: controller.isLookingUpItem.value, onTap: () => _openLookupSheet(context)),
                 const SizedBox(height: 16),
-                if (controller.isHydratingOrderItems.value) ...[
-                  const _InlineBanner(
-                    icon: Icons.sync_outlined,
-                    message: 'Loading live item details, prices, and images...',
-                    color: AppColors.primary,
-                    backgroundColor: Color(0xFFEFF3FF),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                if (controller.isHydratingOrderItems.value) ...[const _InlineBanner(icon: Icons.sync_outlined, message: 'Loading live item details, prices, and images...', color: AppColors.primary, backgroundColor: Color(0xFFEFF3FF)), const SizedBox(height: 12)],
                 if (controller.syncWarnings.isNotEmpty) ...[
-                  for (final warning in controller.syncWarnings) ...[
-                    _InlineBanner(
-                      icon: Icons.info_outline,
-                      message: warning,
-                      color: Colors.orange.shade800,
-                      backgroundColor: Colors.orange.shade50,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                  for (final warning in controller.syncWarnings) ...[_InlineBanner(icon: Icons.info_outline, message: warning, color: Colors.orange.shade800, backgroundColor: Colors.orange.shade50), const SizedBox(height: 8)],
                   const SizedBox(height: 4),
                 ],
                 if (items.isEmpty)
@@ -105,27 +67,14 @@ class OrderCreateView extends GetView<OrderCreateController> {
                     _OrderCartItemCard(
                       item: item,
                       selectedPrice: controller.selectedPriceForCartItem(item),
-                      onDecrease: item.quantity > 1
-                          ? () => controller.updateCartItemQuantity(
-                              item,
-                              item.quantity - 1,
-                            )
-                          : null,
-                      onIncrease: () => controller.updateCartItemQuantity(
-                        item,
-                        item.quantity + 1,
-                      ),
-                      onQuantityChanged: (quantity) =>
-                          controller.updateCartItemQuantity(item, quantity),
+                      onDecrease: item.quantity > 1 ? () => controller.updateCartItemQuantity(item, item.quantity - 1) : null,
+                      onIncrease: () => controller.updateCartItemQuantity(item, item.quantity + 1),
+                      onQuantityChanged: (quantity) => controller.updateCartItemQuantity(item, quantity),
                       onRemove: () => controller.removeCartItem(item),
                     ),
                     const SizedBox(height: 12),
                   ],
-                  _TotalsCard(
-                    lineCount: controller.lineCount,
-                    totalQuantity: controller.totalQuantity,
-                    totalAmount: controller.totalAmount,
-                  ),
+                  _TotalsCard(lineCount: controller.lineCount, totalQuantity: controller.totalQuantity, totalAmount: controller.totalAmount),
                 ],
               ],
             );
@@ -136,11 +85,7 @@ class OrderCreateView extends GetView<OrderCreateController> {
   }
 
   Future<void> _openLookupSheet(BuildContext context) async {
-    final lookup = await SearchableItemLookupSheet.open(
-      context,
-      title: 'Add Order Item',
-      subtitle: 'Search by item code/name or scan QR to add an item.',
-    );
+    final lookup = await SearchableItemLookupSheet.open(context, title: 'Add Order Item', subtitle: 'Search by item code/name or scan QR to add an item.');
 
     if (lookup == null || lookup.trim().isEmpty) {
       return;
@@ -150,14 +95,7 @@ class OrderCreateView extends GetView<OrderCreateController> {
 }
 
 class _OrderCartHero extends StatelessWidget {
-  const _OrderCartHero({
-    required this.title,
-    required this.entryNo,
-    required this.entryDate,
-    required this.lineCount,
-    required this.totalQuantity,
-    required this.totalAmount,
-  });
+  const _OrderCartHero({required this.title, required this.entryNo, required this.entryDate, required this.lineCount, required this.totalQuantity, required this.totalAmount});
 
   final String title;
   final int entryNo;
@@ -170,46 +108,27 @@ class _OrderCartHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(28),
-      ),
+      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(28)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
             'Order #${entryNo <= 0 ? '-' : entryNo} • $entryDate',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.82),
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              _HeroChip(
-                icon: Icons.list_alt_outlined,
-                label: '$lineCount line(s)',
-              ),
-              _HeroChip(
-                icon: Icons.inventory_2_outlined,
-                label: '$totalQuantity qty',
-              ),
-              _HeroChip(
-                icon: Icons.payments_outlined,
-                label: _formatAmount(totalAmount),
-              ),
+              _HeroChip(icon: Icons.list_alt_outlined, label: '$lineCount line(s)'),
+              _HeroChip(icon: Icons.inventory_2_outlined, label: '$totalQuantity qty'),
+              _HeroChip(icon: Icons.payments_outlined, label: _formatAmount(totalAmount)),
             ],
           ),
         ],
@@ -240,10 +159,7 @@ class _HeroChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -267,13 +183,8 @@ class _PartyCard extends StatelessWidget {
             controller: controller.partyNameController,
             textInputAction: TextInputAction.next,
             scrollPadding: const EdgeInsets.only(bottom: 180),
-            decoration: _softInputDecoration(
-              labelText: 'Party Name',
-              hintText: 'Enter party name',
-              prefixIcon: const Icon(Icons.person_outline),
-            ),
-            validator: (value) =>
-                (value ?? '').trim().isEmpty ? 'Party name is required' : null,
+            decoration: _softInputDecoration(labelText: 'Party Name', hintText: 'Enter party name', prefixIcon: const Icon(Icons.person_outline)),
+            validator: (value) => (value ?? '').trim().isEmpty ? 'Party name is required' : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -282,11 +193,8 @@ class _PartyCard extends StatelessWidget {
             inputFormatters: controller.mobileFormatters,
             textInputAction: TextInputAction.done,
             scrollPadding: const EdgeInsets.only(bottom: 180),
-            decoration: _softInputDecoration(
-              labelText: 'Mobile No',
-              hintText: 'Enter mobile no',
-              prefixIcon: const Icon(Icons.phone_outlined),
-            ),
+            maxLength: 10,
+            decoration: _softInputDecoration(labelText: 'Mobile No', hintText: 'Enter mobile no', prefixIcon: const Icon(Icons.phone_outlined)),
             validator: (value) {
               final digits = (value ?? '').trim();
               if (digits.isEmpty) {
@@ -305,11 +213,7 @@ class _PartyCard extends StatelessWidget {
 }
 
 class _PriceSelector extends StatelessWidget {
-  const _PriceSelector({
-    required this.categories,
-    required this.selectedCategory,
-    required this.onSelected,
-  });
+  const _PriceSelector({required this.categories, required this.selectedCategory, required this.onSelected});
 
   final List<PriceCategoryModel> categories;
   final PriceCategoryModel? selectedCategory;
@@ -335,24 +239,12 @@ class _PriceSelector extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
                       label: Text(category.displayName),
-                      selected:
-                          selectedCategory?.categoryNo == category.categoryNo,
+                      selected: selectedCategory?.categoryNo == category.categoryNo,
                       onSelected: (_) => onSelected(category),
                       selectedColor: AppColors.primary,
                       backgroundColor: const Color(0xFFF6F6F6),
-                      labelStyle: TextStyle(
-                        color:
-                            selectedCategory?.categoryNo == category.categoryNo
-                            ? Colors.white
-                            : AppColors.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      side: BorderSide(
-                        color:
-                            selectedCategory?.categoryNo == category.categoryNo
-                            ? AppColors.primary
-                            : Colors.black12,
-                      ),
+                      labelStyle: TextStyle(color: selectedCategory?.categoryNo == category.categoryNo ? Colors.white : AppColors.primary, fontWeight: FontWeight.w800),
+                      side: BorderSide(color: selectedCategory?.categoryNo == category.categoryNo ? AppColors.primary : Colors.black12),
                     ),
                   ),
                 )
@@ -379,16 +271,7 @@ class _LookupCard extends StatelessWidget {
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: isLoading ? null : onTap,
-          icon: isLoading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Icon(Icons.qr_code_scanner_outlined),
+          icon: isLoading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.qr_code_scanner_outlined),
           label: Text(isLoading ? 'Searching...' : 'Scan QR / Add Item'),
         ),
       ),
@@ -397,14 +280,7 @@ class _LookupCard extends StatelessWidget {
 }
 
 class _OrderCartItemCard extends StatelessWidget {
-  const _OrderCartItemCard({
-    required this.item,
-    required this.selectedPrice,
-    required this.onDecrease,
-    required this.onIncrease,
-    required this.onQuantityChanged,
-    required this.onRemove,
-  });
+  const _OrderCartItemCard({required this.item, required this.selectedPrice, required this.onDecrease, required this.onIncrease, required this.onQuantityChanged, required this.onRemove});
 
   final CartItemModel item;
   final ItemPriceModel selectedPrice;
@@ -436,14 +312,7 @@ class _OrderCartItemCard extends StatelessWidget {
                   width: 62,
                   height: 62,
                   color: AppColors.primary.withValues(alpha: 0.06),
-                  child: FallbackNetworkImage(
-                    imageUrls: [
-                      ...item.imageUrls,
-                      if ((item.imageUrl ?? '').isNotEmpty) item.imageUrl!,
-                    ],
-                    iconColor: AppColors.primary,
-                    iconSize: 24,
-                  ),
+                  child: FallbackNetworkImage(imageUrls: [...item.imageUrls, if ((item.imageUrl ?? '').isNotEmpty) item.imageUrl!], iconColor: AppColors.primary, iconSize: 24),
                 ),
               ),
               const SizedBox(width: 12),
@@ -453,23 +322,14 @@ class _OrderCartItemCard extends StatelessWidget {
                   children: [
                     Text(
                       item.itemName.isEmpty ? 'No item name' : item.itemName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      'Code ${item.itemCode.isEmpty ? '-' : item.itemCode} • ${selectedPrice.displayName}',
-                      style: TextStyle(color: Colors.grey.shade700),
-                    ),
+                    Text('Code ${item.itemCode.isEmpty ? '-' : item.itemCode} • ${selectedPrice.displayName}', style: TextStyle(color: Colors.grey.shade700)),
                     const SizedBox(height: 6),
                     Text(
                       'Price ${_formatAmount(selectedPrice.finalPrice)} • Stock ${hasOpenLimit ? 'not checked' : item.availableQuantity}',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -488,20 +348,14 @@ class _OrderCartItemCard extends StatelessWidget {
                 width: 86,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: _OrderCartQuantityInput(
-                    quantity: item.quantity,
-                    onChanged: onQuantityChanged,
-                  ),
+                  child: _OrderCartQuantityInput(quantity: item.quantity, onChanged: onQuantityChanged),
                 ),
               ),
               _QtyIconButton(icon: Icons.add, onTap: onIncrease),
               const Spacer(),
               Text(
                 _formatAmount(selectedPrice.finalPrice * item.quantity),
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900),
               ),
             ],
           ),
@@ -512,17 +366,13 @@ class _OrderCartItemCard extends StatelessWidget {
 }
 
 class _OrderCartQuantityInput extends StatefulWidget {
-  const _OrderCartQuantityInput({
-    required this.quantity,
-    required this.onChanged,
-  });
+  const _OrderCartQuantityInput({required this.quantity, required this.onChanged});
 
   final int quantity;
   final ValueChanged<int> onChanged;
 
   @override
-  State<_OrderCartQuantityInput> createState() =>
-      _OrderCartQuantityInputState();
+  State<_OrderCartQuantityInput> createState() => _OrderCartQuantityInputState();
 }
 
 class _OrderCartQuantityInputState extends State<_OrderCartQuantityInput> {
@@ -540,8 +390,7 @@ class _OrderCartQuantityInputState extends State<_OrderCartQuantityInput> {
   void didUpdateWidget(covariant _OrderCartQuantityInput oldWidget) {
     super.didUpdateWidget(oldWidget);
     final visibleQuantity = int.tryParse(_controller.text.trim());
-    if (widget.quantity != oldWidget.quantity &&
-        (!_focusNode.hasFocus || visibleQuantity != widget.quantity)) {
+    if (widget.quantity != oldWidget.quantity && (!_focusNode.hasFocus || visibleQuantity != widget.quantity)) {
       _setText(widget.quantity.toString());
     }
   }
@@ -604,11 +453,7 @@ class _OrderCartQuantityInputState extends State<_OrderCartQuantityInput> {
         contentPadding: const EdgeInsets.symmetric(vertical: 8),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w800,
-        color: AppColors.primary,
-      ),
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary),
     );
   }
 }
@@ -627,28 +472,15 @@ class _QtyIconButton extends StatelessWidget {
       child: Container(
         width: 36,
         height: 36,
-        decoration: BoxDecoration(
-          color: onTap == null
-              ? Colors.grey.shade200
-              : AppColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: onTap == null ? Colors.grey : AppColors.primary,
-        ),
+        decoration: BoxDecoration(color: onTap == null ? Colors.grey.shade200 : AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, size: 18, color: onTap == null ? Colors.grey : AppColors.primary),
       ),
     );
   }
 }
 
 class _TotalsCard extends StatelessWidget {
-  const _TotalsCard({
-    required this.lineCount,
-    required this.totalQuantity,
-    required this.totalAmount,
-  });
+  const _TotalsCard({required this.lineCount, required this.totalQuantity, required this.totalAmount});
 
   final int lineCount;
   final int totalQuantity;
@@ -669,11 +501,7 @@ class _TotalsCard extends StatelessWidget {
           const SizedBox(height: 10),
           _CartTotalRow(label: 'Total Qty', value: '$totalQuantity'),
           const SizedBox(height: 10),
-          _CartTotalRow(
-            label: 'Amount',
-            value: _formatAmount(totalAmount),
-            emphasized: true,
-          ),
+          _CartTotalRow(label: 'Amount', value: _formatAmount(totalAmount), emphasized: true),
         ],
       ),
     );
@@ -681,11 +509,7 @@ class _TotalsCard extends StatelessWidget {
 }
 
 class _CartTotalRow extends StatelessWidget {
-  const _CartTotalRow({
-    required this.label,
-    required this.value,
-    this.emphasized = false,
-  });
+  const _CartTotalRow({required this.label, required this.value, this.emphasized = false});
 
   final String label;
   final String value;
@@ -700,11 +524,7 @@ class _CartTotalRow extends StatelessWidget {
         ),
         Text(
           value,
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
-            fontSize: emphasized ? 18 : 15,
-          ),
+          style: TextStyle(color: AppColors.primary, fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700, fontSize: emphasized ? 18 : 15),
         ),
       ],
     );
@@ -712,17 +532,7 @@ class _CartTotalRow extends StatelessWidget {
 }
 
 class _SubmitBar extends StatelessWidget {
-  const _SubmitBar({
-    required this.lineCount,
-    required this.totalQuantity,
-    required this.totalAmount,
-    required this.isPreparing,
-    required this.isSubmitting,
-    required this.submitLabel,
-    required this.submittingLabel,
-    required this.preparingLabel,
-    required this.onSubmit,
-  });
+  const _SubmitBar({required this.lineCount, required this.totalQuantity, required this.totalAmount, required this.isPreparing, required this.isSubmitting, required this.submitLabel, required this.submittingLabel, required this.preparingLabel, required this.onSubmit});
 
   final int lineCount;
   final int totalQuantity;
@@ -742,13 +552,7 @@ class _SubmitBar extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.black12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 18, offset: const Offset(0, 8))],
       ),
       child: Row(
         children: [
@@ -759,16 +563,10 @@ class _SubmitBar extends StatelessWidget {
               children: [
                 Text(
                   '$lineCount item(s) • $totalQuantity qty',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  _formatAmount(totalAmount),
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
+                Text(_formatAmount(totalAmount), style: TextStyle(color: Colors.grey.shade700)),
               ],
             ),
           ),
@@ -778,14 +576,7 @@ class _SubmitBar extends StatelessWidget {
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      ),
+                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
                       const SizedBox(width: 8),
                       Text(isPreparing ? preparingLabel : submittingLabel),
                     ],
@@ -799,11 +590,7 @@ class _SubmitBar extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
+  const _SectionCard({required this.title, required this.subtitle, required this.child});
 
   final String title;
   final String subtitle;
@@ -824,11 +611,7 @@ class _SectionCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           Text(subtitle, style: TextStyle(color: Colors.grey.shade700)),
@@ -854,18 +637,11 @@ class _EmptyCartCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.shopping_cart_outlined,
-            color: Colors.grey.shade400,
-            size: 40,
-          ),
+          Icon(Icons.shopping_cart_outlined, color: Colors.grey.shade400, size: 40),
           const SizedBox(height: 10),
           const Text(
             'No items added',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary),
           ),
           const SizedBox(height: 4),
           Text(
@@ -880,12 +656,7 @@ class _EmptyCartCard extends StatelessWidget {
 }
 
 class _InlineBanner extends StatelessWidget {
-  const _InlineBanner({
-    required this.icon,
-    required this.message,
-    required this.color,
-    required this.backgroundColor,
-  });
+  const _InlineBanner({required this.icon, required this.message, required this.color, required this.backgroundColor});
 
   final IconData icon;
   final String message;
@@ -918,11 +689,7 @@ class _InlineBanner extends StatelessWidget {
   }
 }
 
-InputDecoration _softInputDecoration({
-  required String labelText,
-  required String hintText,
-  Widget? prefixIcon,
-}) {
+InputDecoration _softInputDecoration({required String labelText, required String hintText, Widget? prefixIcon}) {
   OutlineInputBorder border(Color color, [double width = 1]) {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),

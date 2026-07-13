@@ -473,7 +473,7 @@ class _LookupResultTile extends StatelessWidget {
                         ),
                         _MiniChip(
                           icon: Icons.shopping_bag_outlined,
-                          label: '${item.totalQuantity} qty',
+                          label: '${_formatQuantity(item.totalQuantity)} qty',
                         ),
                       ],
                     ),
@@ -489,6 +489,10 @@ class _LookupResultTile extends StatelessWidget {
     );
   }
 }
+
+String _formatQuantity(double value) => value == value.roundToDouble()
+    ? value.toStringAsFixed(0)
+    : value.toStringAsFixed(2);
 
 class _MiniChip extends StatelessWidget {
   const _MiniChip({required this.icon, required this.label});

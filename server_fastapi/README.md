@@ -101,7 +101,29 @@ If this repo is pushed to GitHub, run the workflow:
 
 - `.github/workflows/build-windows-exe.yml`
 
-It will build the Windows desktop package on `windows-latest` and upload it as an artifact.
+It will build the Windows desktop package on `windows-latest`, upload it as an artifact, and publish a GitHub Release with:
+
+- `SKBagsDesktop.exe`
+- `latest.json`
+
+### Auto Update
+
+Release builds include an auto-updater. On startup, the desktop app checks `latest.json`; when a newer version is found, it downloads the new EXE, verifies the SHA-256 checksum, stops the current app, replaces the EXE, and opens the new version.
+
+Manual release:
+
+1. Open GitHub Actions.
+2. Run `Build Windows Desktop EXE`.
+3. Enter a version like `1.0.5`.
+
+Automatic release:
+
+- Push to `main`; the workflow creates version `1.0.<run_number>`.
+
+The updater uses:
+
+- `AUTO_UPDATE=true`
+- `UPDATE_MANIFEST_URL=https://github.com/<owner>/<repo>/releases/latest/download/latest.json`
 
 ## Assumptions
 

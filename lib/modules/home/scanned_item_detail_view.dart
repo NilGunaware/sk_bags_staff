@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
@@ -100,174 +99,69 @@ class _ScannedItemDetailViewState extends State<ScannedItemDetailView> {
         ),
       ),
       body: SafeArea(
-        child: Obx(() {
-          final selectedCategory = controller.selectedPriceCategory;
-          final selectedPrice = detail.priceFor(selectedCategory);
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-            children: [
-              _HeroCard(
-                detail: detail,
-                selectedCategoryName:
-                    selectedCategory?.displayName ?? 'No Category',
-                selectedPrice: selectedPrice.finalPrice,
-              ),
-              const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Stock Availability',
-                child: Column(
-                  children: [
-                    _MetricRow(
-                      label: ApiEndpoints.ahmLabel,
-                      value: _formatNumber(
-                        detail.quantityForServer(ApiEndpoints.ahmLabel),
-                      ),
-                    ),
-                    const Divider(height: 20),
-                    _MetricRow(
-                      label: ApiEndpoints.bhuLabel,
-                      value: _formatNumber(
-                        detail.quantityForServer(ApiEndpoints.bhuLabel),
-                      ),
-                    ),
-                    const Divider(height: 20),
-                    _MetricRow(
-                      label: 'Total Qty',
-                      value: _formatNumber(detail.totalQuantity),
-                      emphasized: true,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Selected Price',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _MetricRow(
-                      label: selectedPrice.displayName,
-                      value: _formatCurrency(selectedPrice.finalPrice),
-                      emphasized: true,
-                    ),
-                    const SizedBox(height: 12),
-                    _MetricRow(
-                      label: 'Base Price',
-                      value: _formatCurrency(selectedPrice.basePrice),
-                    ),
-                    const SizedBox(height: 8),
-                    _MetricRow(
-                      label: 'Discount',
-                      value:
-                          '${selectedPrice.discountPercent.toStringAsFixed(0)}%',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Add Quantity',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Live stock is ${detail.availableOrderQuantity}. Order quantity is not limited by stock.',
-                      style: TextStyle(color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        _StepButton(
-                          icon: Icons.remove,
-                          onTap: quantity > 1
-                              ? () => _setQuantity(quantity - 1)
-                              : null,
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: TextField(
-                              controller: _quantityController,
-                              textAlign: TextAlign.center,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              onChanged: _handleQuantityInput,
-                              decoration: InputDecoration(
-                                labelText: 'Qty',
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 12,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        _StepButton(
-                          icon: Icons.add,
-                          onTap: () => _setQuantity(quantity + 1),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (detail.warnings.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _SectionCard(
-                  title: 'Server Notes',
-                  child: Column(
-                    children: detail.warnings
-                        .map(
-                          (warning) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.info_outline,
-                                  size: 18,
-                                  color: Color(0xFFB45309),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(warning)),
-                              ],
-                            ),
-                          ),
-                        )
-                        .toList(),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+          children: [
+            _ItemDetailsCard(detail: detail),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Quantity',
+              child: Row(
+                children: [
+                  _StepButton(
+                    icon: Icons.remove,
+                    onTap: quantity > 1
+                        ? () => _setQuantity(quantity - 1)
+                        : null,
                   ),
-                ),
-              ],
-            ],
-          );
-        }),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: TextField(
+                        controller: _quantityController,
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        onChanged: _handleQuantityInput,
+                        decoration: InputDecoration(
+                          labelText: 'Qty',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  _StepButton(
+                    icon: Icons.add,
+                    onTap: () => _setQuantity(quantity + 1),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({
-    required this.detail,
-    required this.selectedCategoryName,
-    required this.selectedPrice,
-  });
+class _ItemDetailsCard extends StatelessWidget {
+  const _ItemDetailsCard({required this.detail});
 
   final MergedItemDetailModel detail;
-  final String selectedCategoryName;
-  final double selectedPrice;
 
   @override
   Widget build(BuildContext context) {
@@ -338,24 +232,14 @@ class _HeroCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _InfoTile(
-                  label: selectedCategoryName,
-                  value: _formatCurrency(selectedPrice),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _InfoTile(
-                  label: 'Total Qty',
-                  value: _formatNumber(detail.totalQuantity),
-                ),
-              ),
-            ],
+          const SizedBox(height: 18),
+          _DetailLine(label: 'Item Code', value: detail.itemCode),
+          _DetailLine(label: 'Item Name', value: detail.itemName),
+          _DetailLine(
+            label: 'Group',
+            value: detail.itemGroup.isEmpty ? '-' : detail.itemGroup,
           ),
+          _DetailLine(label: 'HSN', value: detail.hsnCode ?? '-'),
         ],
       ),
     );
@@ -396,39 +280,6 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-class _MetricRow extends StatelessWidget {
-  const _MetricRow({
-    required this.label,
-    required this.value,
-    this.emphasized = false,
-  });
-
-  final String label;
-  final String value;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final valueStyle = TextStyle(
-      fontSize: emphasized ? 18 : 15,
-      fontWeight: emphasized ? FontWeight.w800 : FontWeight.w700,
-      color: emphasized ? AppColors.primary : Colors.black87,
-    );
-
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
-          ),
-        ),
-        Text(value, style: valueStyle),
-      ],
-    );
-  }
-}
-
 class _InfoChip extends StatelessWidget {
   const _InfoChip({required this.label});
 
@@ -453,34 +304,39 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.label, required this.value});
+class _DetailLine extends StatelessWidget {
+  const _DetailLine({required this.label, required this.value});
 
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          SizedBox(
+            width: 82,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.68),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              value.trim().isEmpty ? '-' : value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                height: 1.25,
+              ),
             ),
           ),
         ],
@@ -517,9 +373,3 @@ class _StepButton extends StatelessWidget {
     );
   }
 }
-
-String _formatCurrency(double value) => value.round().toString();
-
-String _formatNumber(double value) => value == value.roundToDouble()
-    ? value.toStringAsFixed(0)
-    : value.toStringAsFixed(2);

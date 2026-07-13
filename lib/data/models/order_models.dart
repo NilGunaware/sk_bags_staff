@@ -167,15 +167,15 @@ class MergedItemModel {
 
   final String itemCode;
   final String itemName;
-  final int totalQuantity;
-  final Map<String, int> serverQuantities;
+  final double totalQuantity;
+  final Map<String, double> serverQuantities;
   final List<String> imageUrls;
   final String? qrCode;
 
   String get key => '${itemCode.trim()}|${itemName.trim()}';
 
   MergedItemModel merge(MergedItemModel other) {
-    final mergedQuantities = <String, int>{...serverQuantities};
+    final mergedQuantities = <String, double>{...serverQuantities};
 
     other.serverQuantities.forEach((server, quantity) {
       mergedQuantities[server] = (mergedQuantities[server] ?? 0) + quantity;
@@ -199,7 +199,7 @@ class MergedItemModel {
     required String serverName,
     required String baseUrl,
   }) {
-    final quantity = _parseInt(
+    final quantity = _parseDouble(
       json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
     );
     final imageJson = json['image'];
@@ -215,7 +215,7 @@ class MergedItemModel {
       itemCode: (json['itemCode'] ?? json['item_code'] ?? '').toString(),
       itemName: (json['itemName'] ?? json['item_name'] ?? '').toString(),
       totalQuantity: quantity,
-      serverQuantities: <String, int>{serverName: quantity},
+      serverQuantities: <String, double>{serverName: quantity},
       imageUrls: _normalizeImageUrls(
         baseUrl: baseUrl,
         values: <dynamic>[

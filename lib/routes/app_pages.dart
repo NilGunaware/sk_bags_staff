@@ -4,6 +4,10 @@ import '../modules/orders/order_create_view.dart';
 import '../modules/orders/order_detail_view.dart';
 import '../modules/orders/order_list_view.dart';
 import '../modules/orders/orders_binding.dart';
+import '../modules/repairs/repair_create_view.dart';
+import '../modules/repairs/repair_detail_view.dart';
+import '../modules/repairs/repair_list_view.dart';
+import '../modules/repairs/repairs_binding.dart';
 import '../modules/scanner/scanner_binding.dart';
 import '../modules/scanner/scanner_view.dart';
 import '../modules/splash/splash_binding.dart';
@@ -50,6 +54,21 @@ class AppPages {
       name: Routes.orderDetail,
       page: () => const OrderDetailView(),
       binding: OrderDetailBinding(),
+    ),
+    GetPage(
+      name: Routes.repairs,
+      page: () => const RepairListView(),
+      binding: RepairListBinding(),
+    ),
+    GetPage(
+      name: Routes.repairCreate,
+      page: () => const RepairCreateView(),
+      binding: RepairCreateBinding(),
+    ),
+    GetPage(
+      name: Routes.repairDetail,
+      page: () => const RepairDetailView(),
+      binding: RepairDetailBinding(),
     ),
   ];
 }

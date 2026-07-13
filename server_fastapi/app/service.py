@@ -12,13 +12,17 @@ from .db import db_connection, rows_to_dicts
 
 
 ITEM_BASE_CTE = """
-WITH FolioAgg AS (
+WITH StockAgg AS (
     SELECT
-        MasterCode,
-        SUM(CAST(ISNULL(D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
-        SUM(CAST(ISNULL(D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
-    FROM dbo.Folio1
-    GROUP BY MasterCode
+        t.MasterCode1 AS MasterCode,
+        SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
+        SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
+    FROM dbo.Tran4 t
+    INNER JOIN dbo.Tran1 v
+        ON v.VchCode = t.VchCode
+    WHERE t.RecType = 0
+      AND CAST(v.[Date] AS DATE) <= CAST(GETDATE() AS DATE)
+    GROUP BY t.MasterCode1
 ),
 PriceAgg AS (
     SELECT
@@ -49,8 +53,8 @@ ItemBase AS (
         CAST(NULL AS NVARCHAR(100)) AS qrCode,
         m.Name AS itemName,
         COALESCE(pg.Name, '') AS itemGroup,
-        COALESCE(fa.itemQuantity, 0) AS itemQuantity,
-        COALESCE(fa.itemQuantityValue, 0) AS itemQuantityValue,
+        COALESCE(sa.itemQuantity, 0) AS itemQuantity,
+        COALESCE(sa.itemQuantityValue, 0) AS itemQuantityValue,
         COALESCE(m.HSNCode, '') AS hsnCode,
         msa.sellingRateHint AS sellingRateHint,
         msa.costRateHint AS costRateHint,
@@ -60,8 +64,8 @@ ItemBase AS (
     FROM dbo.Master1 m
     LEFT JOIN dbo.Master1 pg
         ON pg.Code = m.ParentGrp
-    LEFT JOIN FolioAgg fa
-        ON fa.MasterCode = m.Code
+    LEFT JOIN StockAgg sa
+        ON sa.MasterCode = m.Code
     LEFT JOIN MasterSupportAgg msa
         ON msa.MasterCode = m.Code
     LEFT JOIN PriceAgg pa
@@ -309,7 +313,13 @@ def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, An
             ON t.MasterCode2 = b.Code
            AND t.RecType = 0
            AND t.MasterCode1 = %(item_master_code)s
+        LEFT JOIN dbo.Tran1 v
+            ON v.VchCode = t.VchCode
         WHERE b.MasterType = 11
+          AND (
+            t.VchCode IS NULL
+            OR CAST(v.[Date] AS DATE) <= CAST(GETDATE() AS DATE)
+          )
         GROUP BY b.Code, b.Name
         ORDER BY b.Code ASC;
         """,

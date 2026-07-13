@@ -11,7 +11,26 @@ import '../../data/models/order_models.dart';
 
 class LocalItemSyncService extends GetxService {
   final http.Client _client = http.Client();
-  static const Duration _serverTimeout = Duration(seconds: 5);
+  static const Duration _serverTimeout = Duration(seconds: 12);
+
+  Future<Map<String, bool>> checkServersHealth() async {
+    final outcomes = await Future.wait(
+      _servers.map(
+        (server) => _fetchJsonOutcome(
+          serverName: server.name,
+          baseUrl: server.baseUrl,
+          endpointPath: '/health',
+        ),
+      ),
+      eagerError: false,
+    );
+
+    return <String, bool>{
+      for (final outcome in outcomes)
+        outcome.serverName:
+            outcome.response != null && _isHealthyResponse(outcome.response!),
+    };
+  }
 
   Future<List<PriceCategoryModel>> fetchPriceCategories() async {
     final outcomes = await Future.wait(
@@ -22,6 +41,7 @@ class LocalItemSyncService extends GetxService {
           endpointPath: '/api/price-categories',
         ),
       ),
+      eagerError: false,
     );
 
     final merged = <int, PriceCategoryModel>{};
@@ -66,6 +86,7 @@ class LocalItemSyncService extends GetxService {
             endpointPath: '/api/items/detail/${Uri.encodeComponent(candidate)}',
           ),
         ),
+        eagerError: false,
       );
       lastOutcomes = outcomes;
       anyReachableServer =
@@ -92,11 +113,19 @@ class LocalItemSyncService extends GetxService {
           continue;
         }
 
-        final detail = _buildItemDetailFromServer(
-          Map<String, dynamic>.from(rawData),
-          serverName: outcome.serverName,
-          baseUrl: outcome.baseUrl,
-        );
+        final MergedItemDetailModel detail;
+        try {
+          detail = _buildItemDetailFromServer(
+            Map<String, dynamic>.from(rawData),
+            serverName: outcome.serverName,
+            baseUrl: outcome.baseUrl,
+          );
+        } catch (error) {
+          debugPrint(
+            '[LocalItemSyncService] ${outcome.serverName} item detail parse failed: $error',
+          );
+          continue;
+        }
 
         mergedDetail = mergedDetail == null
             ? detail
@@ -148,13 +177,14 @@ class LocalItemSyncService extends GetxService {
     final merged = <String, MergedItemModel>{};
     final serverResults = await Future.wait(
       _servers.map(
-        (server) => _searchServer(
+        (server) => _safeSearchServer(
           server: server,
           page: page,
           pageSize: pageSize,
           query: query,
         ),
       ),
+      eagerError: false,
     );
 
     final reachableServerCount = serverResults
@@ -162,16 +192,28 @@ class LocalItemSyncService extends GetxService {
         .length;
     final warnings = <String>[
       if (reachableServerCount == 0)
-        'Item servers are unavailable right now. Check the dashboard status.',
+        'Item servers are unavailable right now. Check the dashboard status.'
+      else
+        for (final result in serverResults)
+          if (!result.isReachable)
+            '${result.serverName} server is unavailable right now.',
     ];
 
     for (final result in serverResults) {
       for (final itemJson in result.items) {
-        final item = MergedItemModel.fromServerJson(
-          itemJson,
-          serverName: result.serverName,
-          baseUrl: result.baseUrl,
-        );
+        final MergedItemModel item;
+        try {
+          item = MergedItemModel.fromServerJson(
+            itemJson,
+            serverName: result.serverName,
+            baseUrl: result.baseUrl,
+          );
+        } catch (error) {
+          debugPrint(
+            '[LocalItemSyncService] ${result.serverName} item parse failed: $error',
+          );
+          continue;
+        }
 
         if (item.itemCode.trim().isEmpty && item.itemName.trim().isEmpty) {
           continue;
@@ -259,29 +301,22 @@ class LocalItemSyncService extends GetxService {
         pageSize: pageSize,
         query: query,
       );
-      final outcomes = await Future.wait(
-        requests.map(
-          (queryParameters) => _fetchItemsOutcome(
-            baseUrl: server.baseUrl,
-            queryParameters: queryParameters,
-          ),
-        ),
-      );
-
-      final successfulOutcomes = outcomes
-          .where((outcome) => outcome.response != null)
-          .toList();
-
-      if (successfulOutcomes.isEmpty) {
-        break;
-      }
-
-      isReachable = true;
       final pageItems = <String, Map<String, dynamic>>{};
       hasMore = false;
+      var receivedResponse = false;
 
-      for (final outcome in successfulOutcomes) {
-        final response = outcome.response!;
+      for (final queryParameters in requests) {
+        final outcome = await _fetchItemsOutcome(
+          serverName: server.name,
+          baseUrl: server.baseUrl,
+          queryParameters: queryParameters,
+        );
+        isReachable = isReachable || outcome.isReachable;
+        final response = outcome.response;
+        if (response == null) {
+          continue;
+        }
+        receivedResponse = true;
         if (response['data'] is! List) {
           continue;
         }
@@ -296,6 +331,14 @@ class LocalItemSyncService extends GetxService {
         }
 
         hasMore = hasMore || _responseHasMore(response, currentPage, pageSize);
+
+        if (pageItems.isNotEmpty) {
+          break;
+        }
+      }
+
+      if (!receivedResponse) {
+        break;
       }
 
       items.addAll(pageItems.values);
@@ -314,7 +357,33 @@ class LocalItemSyncService extends GetxService {
     );
   }
 
+  Future<_ServerItemBatch> _safeSearchServer({
+    required _LocalServerConfig server,
+    required int page,
+    required int pageSize,
+    required String query,
+  }) async {
+    try {
+      return await _searchServer(
+        server: server,
+        page: page,
+        pageSize: pageSize,
+        query: query,
+      );
+    } catch (error) {
+      debugPrint('[LocalItemSyncService] ${server.name} search failed: $error');
+      return _ServerItemBatch(
+        serverName: server.name,
+        baseUrl: server.baseUrl,
+        items: const <Map<String, dynamic>>[],
+        hasMore: false,
+        isReachable: false,
+      );
+    }
+  }
+
   Future<_FetchOutcome> _fetchItemsOutcome({
+    required String serverName,
     required String baseUrl,
     required Map<String, String> queryParameters,
   }) async {
@@ -323,11 +392,31 @@ class LocalItemSyncService extends GetxService {
         baseUrl: baseUrl,
         queryParameters: queryParameters,
       );
-      return _FetchOutcome(response: response);
+      return _FetchOutcome(
+        serverName: serverName,
+        baseUrl: baseUrl,
+        response: response,
+        isReachable: true,
+      );
     } on TimeoutException {
-      return const _FetchOutcome(isTimeout: true);
+      return _FetchOutcome(
+        serverName: serverName,
+        baseUrl: baseUrl,
+        isTimeout: true,
+      );
+    } on _HttpStatusException catch (error) {
+      return _FetchOutcome(
+        serverName: serverName,
+        baseUrl: baseUrl,
+        statusCode: error.statusCode,
+        isReachable: true,
+      );
     } catch (error) {
-      return _FetchOutcome(errorMessage: error.toString());
+      return _FetchOutcome(
+        serverName: serverName,
+        baseUrl: baseUrl,
+        errorMessage: error.toString(),
+      );
     }
   }
 
@@ -453,6 +542,35 @@ class LocalItemSyncService extends GetxService {
       if ((image?.available ?? false) && (image?.url?.isNotEmpty ?? false))
         image!.url!,
     ];
+    final branchStocks = json['branchStocks'] is List
+        ? (json['branchStocks'] as List)
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    BranchStockModel.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .toList()
+        : const <BranchStockModel>[];
+    final branchQuantity = branchStocks.fold<double>(
+      0,
+      (sum, branch) => sum + branch.quantity,
+    );
+    final branchQuantityValue = branchStocks.fold<double>(
+      0,
+      (sum, branch) => sum + branch.quantityValue,
+    );
+    final apiQuantity = _parseDouble(
+      json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
+    );
+    final apiQuantityValue = _parseDouble(
+      json['itemQuantityValue'] ?? json['item_quantity_value'],
+    );
+    final serverQuantity = branchStocks.isNotEmpty
+        ? branchQuantity
+        : apiQuantity;
+    final serverQuantityValue = branchStocks.isNotEmpty
+        ? branchQuantityValue
+        : apiQuantityValue;
 
     return MergedItemDetailModel(
       itemMasterCode: _parseInt(
@@ -463,28 +581,11 @@ class LocalItemSyncService extends GetxService {
       itemGroup: (json['itemGroup'] ?? json['item_group'] ?? '').toString(),
       qrCode: _parseNullableString(json['qrCode'] ?? json['qr_code']),
       hsnCode: _parseNullableString(json['hsnCode'] ?? json['hsn_code']),
-      totalQuantity: _parseDouble(
-        json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
-      ),
-      totalQuantityValue: _parseDouble(
-        json['itemQuantityValue'] ?? json['item_quantity_value'],
-      ),
-      serverQuantities: <String, double>{
-        serverName: _parseDouble(
-          json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
-        ),
-      },
+      totalQuantity: serverQuantity,
+      totalQuantityValue: serverQuantityValue,
+      serverQuantities: <String, double>{serverName: serverQuantity},
       serverBranchStocks: <String, List<BranchStockModel>>{
-        serverName: json['branchStocks'] is List
-            ? (json['branchStocks'] as List)
-                  .whereType<Map>()
-                  .map(
-                    (item) => BranchStockModel.fromJson(
-                      Map<String, dynamic>.from(item),
-                    ),
-                  )
-                  .toList()
-            : const <BranchStockModel>[],
+        serverName: branchStocks,
       },
       image: image,
       imageUrls: imageUrls,
@@ -584,8 +685,8 @@ class LocalItemSyncService extends GetxService {
 
     return <Map<String, String>>[
       <String, String>{...base, 'search': trimmedQuery},
-      <String, String>{...base, 'itemCode': trimmedQuery},
       <String, String>{...base, 'itemName': trimmedQuery},
+      <String, String>{...base, 'itemCode': trimmedQuery},
     ];
   }
 
@@ -605,6 +706,14 @@ class LocalItemSyncService extends GetxService {
 
     final data = response['data'];
     return data is List && data.length >= pageSize;
+  }
+
+  bool _isHealthyResponse(Map<String, dynamic> response) {
+    final status = response['status']?.toString().trim().toLowerCase();
+    if (status == null || status.isEmpty) {
+      return true;
+    }
+    return status == 'ok' || status == 'true' || status == 'online';
   }
 
   String _buildServerItemKey(Map<String, dynamic> item) {

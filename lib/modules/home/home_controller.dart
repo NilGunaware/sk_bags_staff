@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -19,7 +18,7 @@ import '../../data/providers/api_provider.dart';
 import '../../routes/app_routes.dart';
 import '../auth/controllers/auth_controller.dart';
 
-enum DashboardModule { physicalStock, billing, liveStock }
+enum DashboardModule { physicalStock, billing, liveStock, repair }
 
 class HomeController extends GetxController {
   final AuthController authController = Get.find<AuthController>();
@@ -559,78 +558,13 @@ class HomeController extends GetxController {
     }
 
     try {
-      final results = await Future.wait<bool>([
-        _checkServerHealth(ApiEndpoints.ahmItemsBaseUrl),
-        _checkServerHealth(ApiEndpoints.bhuItemsBaseUrl),
-      ]);
-
-      serverHealthStates.assignAll(<String, bool?>{
-        ApiEndpoints.ahmLabel: results[0],
-        ApiEndpoints.bhuLabel: results[1],
-      });
+      final results = await _itemSyncService.checkServersHealth();
+      serverHealthStates.assignAll(
+        results.map((label, isOnline) => MapEntry(label, isOnline)),
+      );
       lastServerHealthCheck.value = DateTime.now();
     } finally {
       isCheckingServerHealth.value = false;
-    }
-  }
-
-  Future<bool> _checkServerHealth(String baseUrl) async {
-    final uri = Uri.parse('$baseUrl/health');
-    _logApiRequest('GET', uri, body: <String, dynamic>{});
-    try {
-      final response = await Dio().get<Map<String, dynamic>>(
-        uri.toString(),
-        options: Options(
-          receiveTimeout: const Duration(seconds: 5),
-          sendTimeout: const Duration(seconds: 5),
-          headers: const <String, dynamic>{'Accept': 'application/json'},
-        ),
-      );
-      _logApiResponse(
-        'GET',
-        uri,
-        response.statusCode ?? 0,
-        response.data ?? <String, dynamic>{},
-      );
-
-      return response.statusCode != null &&
-          response.statusCode! >= 200 &&
-          response.statusCode! < 300;
-    } catch (error) {
-      debugPrint('========== DASHBOARD API RESPONSE ==========');
-      debugPrint('GET $uri [ERROR]');
-      debugPrint('Body: ${_formatJsonForLog({'error': error.toString()})}');
-      return false;
-    }
-  }
-
-  void _logApiRequest(String method, Uri uri, {Object? body}) {
-    debugPrint('========== DASHBOARD API REQUEST ==========');
-    debugPrint('$method $uri');
-    debugPrint('Body: ${_formatJsonForLog(body ?? <String, dynamic>{})}');
-  }
-
-  void _logApiResponse(String method, Uri uri, int statusCode, Object? body) {
-    debugPrint('========== DASHBOARD API RESPONSE ==========');
-    debugPrint('$method $uri [$statusCode]');
-    debugPrint('Body: ${_formatJsonForLog(body)}');
-  }
-
-  String _formatJsonForLog(Object? value) {
-    try {
-      final dynamic jsonValue;
-      if (value == null) {
-        jsonValue = <String, dynamic>{};
-      } else if (value is String) {
-        jsonValue = value.trim().isEmpty
-            ? <String, dynamic>{}
-            : jsonDecode(value);
-      } else {
-        jsonValue = value;
-      }
-      return const JsonEncoder.withIndent('  ').convert(jsonValue);
-    } catch (_) {
-      return value?.toString() ?? '';
     }
   }
 

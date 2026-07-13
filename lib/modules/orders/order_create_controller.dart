@@ -316,7 +316,7 @@ class OrderCreateController extends GetxController {
       id: editing?.id ?? '',
       itemCode: item.itemCode,
       itemName: item.itemName,
-      availableQuantity: item.totalQuantity,
+      availableQuantity: item.totalQuantity.floor(),
       quantity: quantity,
     );
 

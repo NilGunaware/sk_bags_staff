@@ -11,7 +11,7 @@ from .config import settings
 from .db import db_connection, rows_to_dicts
 
 
-ITEM_BASE_CTE = """
+ITEM_BASE_CTE_DATED_STOCK = """
 WITH StockAgg AS (
     SELECT
         t.MasterCode1 AS MasterCode,
@@ -73,6 +73,70 @@ ItemBase AS (
     WHERE m.MasterType = 6
 )
 """
+
+ITEM_BASE_CTE_LEGACY_STOCK = """
+WITH StockAgg AS (
+    SELECT
+        MasterCode AS MasterCode,
+        SUM(CAST(ISNULL(D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
+        SUM(CAST(ISNULL(D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
+    FROM dbo.Folio1
+    GROUP BY MasterCode
+),
+PriceAgg AS (
+    SELECT
+        MasterCode,
+        COUNT(CASE WHEN I1 BETWEEN 101 AND 126 AND ISNULL(D1, 0) > 0 THEN 1 END) AS priceCount,
+        MIN(CASE WHEN I1 BETWEEN 101 AND 126 AND ISNULL(D1, 0) > 0
+            THEN CAST(D1 - ((D1 * ISNULL(D2, 0)) / 100.0) AS DECIMAL(18, 2)) END) AS minFinalPrice,
+        MAX(CASE WHEN I1 BETWEEN 101 AND 126 AND ISNULL(D1, 0) > 0
+            THEN CAST(D1 - ((D1 * ISNULL(D2, 0)) / 100.0) AS DECIMAL(18, 2)) END) AS maxFinalPrice
+    FROM dbo.MasterSupport
+    WHERE MasterType = 6
+    GROUP BY MasterCode
+),
+MasterSupportAgg AS (
+    SELECT
+        MasterCode,
+        MAX(CASE WHEN NULLIF(C1, '') IS NOT NULL THEN C1 END) AS supportItemCode,
+        MAX(CASE WHEN D3 > 0 THEN CAST(D3 AS DECIMAL(18, 2)) END) AS sellingRateHint,
+        MAX(CASE WHEN D1 > 0 THEN CAST(D1 AS DECIMAL(18, 2)) END) AS costRateHint
+    FROM dbo.MasterSupport
+    WHERE MasterType = 6
+    GROUP BY MasterCode
+),
+ItemBase AS (
+    SELECT
+        m.Code AS itemMasterCode,
+        CAST(COALESCE(NULLIF(m.Alias, ''), msa.supportItemCode, CAST(m.Code AS NVARCHAR(50))) AS NVARCHAR(50)) AS itemCode,
+        CAST(NULL AS NVARCHAR(100)) AS qrCode,
+        m.Name AS itemName,
+        COALESCE(pg.Name, '') AS itemGroup,
+        COALESCE(sa.itemQuantity, 0) AS itemQuantity,
+        COALESCE(sa.itemQuantityValue, 0) AS itemQuantityValue,
+        COALESCE(m.HSNCode, '') AS hsnCode,
+        msa.sellingRateHint AS sellingRateHint,
+        msa.costRateHint AS costRateHint,
+        COALESCE(pa.priceCount, 0) AS priceCount,
+        pa.minFinalPrice AS minFinalPrice,
+        pa.maxFinalPrice AS maxFinalPrice
+    FROM dbo.Master1 m
+    LEFT JOIN dbo.Master1 pg
+        ON pg.Code = m.ParentGrp
+    LEFT JOIN StockAgg sa
+        ON sa.MasterCode = m.Code
+    LEFT JOIN MasterSupportAgg msa
+        ON msa.MasterCode = m.Code
+    LEFT JOIN PriceAgg pa
+        ON pa.MasterCode = m.Code
+    WHERE m.MasterType = 6
+)
+"""
+
+ITEM_BASE_CTES = (
+    ITEM_BASE_CTE_DATED_STOCK,
+    ITEM_BASE_CTE_LEGACY_STOCK,
+)
 
 
 PRICE_SLOT_MIN = 101
@@ -301,30 +365,50 @@ def _resolve_item_image(item_code: str, support_codes: list[str]) -> tuple[dict[
 
 
 def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, Any]]:
-    cursor.execute(
-        """
-        SELECT
-            b.Code AS branchCode,
-            b.Name AS branchName,
-            COALESCE(SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))), 0) AS itemQuantity,
-            COALESCE(SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))), 0) AS itemQuantityValue
-        FROM dbo.Master1 b
-        LEFT JOIN dbo.Tran4 t
-            ON t.MasterCode2 = b.Code
-           AND t.RecType = 0
-           AND t.MasterCode1 = %(item_master_code)s
-        LEFT JOIN dbo.Tran1 v
-            ON v.VchCode = t.VchCode
-        WHERE b.MasterType = 11
-          AND (
-            t.VchCode IS NULL
-            OR CAST(v.[Date] AS DATE) <= CAST(GETDATE() AS DATE)
-          )
-        GROUP BY b.Code, b.Name
-        ORDER BY b.Code ASC;
-        """,
-        {"item_master_code": item_master_code},
-    )
+    try:
+        cursor.execute(
+            """
+            SELECT
+                b.Code AS branchCode,
+                b.Name AS branchName,
+                COALESCE(SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))), 0) AS itemQuantity,
+                COALESCE(SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))), 0) AS itemQuantityValue
+            FROM dbo.Master1 b
+            LEFT JOIN dbo.Tran4 t
+                ON t.MasterCode2 = b.Code
+               AND t.RecType = 0
+               AND t.MasterCode1 = %(item_master_code)s
+            LEFT JOIN dbo.Tran1 v
+                ON v.VchCode = t.VchCode
+            WHERE b.MasterType = 11
+              AND (
+                t.VchCode IS NULL
+                OR CAST(v.[Date] AS DATE) <= CAST(GETDATE() AS DATE)
+              )
+            GROUP BY b.Code, b.Name
+            ORDER BY b.Code ASC;
+            """,
+            {"item_master_code": item_master_code},
+        )
+    except Exception:
+        cursor.execute(
+            """
+            SELECT
+                b.Code AS branchCode,
+                b.Name AS branchName,
+                COALESCE(SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))), 0) AS itemQuantity,
+                COALESCE(SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))), 0) AS itemQuantityValue
+            FROM dbo.Master1 b
+            LEFT JOIN dbo.Tran4 t
+                ON t.MasterCode2 = b.Code
+               AND t.RecType = 0
+               AND t.MasterCode1 = %(item_master_code)s
+            WHERE b.MasterType = 11
+            GROUP BY b.Code, b.Name
+            ORDER BY b.Code ASC;
+            """,
+            {"item_master_code": item_master_code},
+        )
     return [_serialize_row(row) for row in rows_to_dicts(cursor)]
 
 
@@ -441,53 +525,62 @@ def list_items(*, search: str, item_code: str, item_name: str, qr_code: str, off
         "page_size": page_size,
     }
 
-    count_sql = f"""
-    {ITEM_BASE_CTE}
-    SELECT COUNT(*) AS totalCount
-    FROM ItemBase
-    WHERE itemCode LIKE %(item_code_pattern)s
-      AND itemName LIKE %(item_name_pattern)s
-      AND (
-        %(search_filter)s = ''
-        OR itemCode LIKE %(search_pattern)s
-        OR itemName LIKE %(search_pattern)s
-      );
-    """
-
-    data_sql = f"""
-    {ITEM_BASE_CTE}
-    SELECT
-        itemMasterCode,
-        itemCode,
-        itemCode AS qrCode,
-        itemName,
-        itemGroup,
-        itemQuantity,
-        itemQuantityValue,
-        hsnCode,
-        sellingRateHint,
-        costRateHint,
-        priceCount,
-        minFinalPrice,
-        maxFinalPrice
-    FROM ItemBase
-    WHERE itemCode LIKE %(item_code_pattern)s
-      AND itemName LIKE %(item_name_pattern)s
-      AND (
-        %(search_filter)s = ''
-        OR itemCode LIKE %(search_pattern)s
-        OR itemName LIKE %(search_pattern)s
-      )
-    ORDER BY itemName ASC, itemMasterCode ASC
-    OFFSET %(offset)s ROWS FETCH NEXT %(page_size)s ROWS ONLY;
-    """
-
     with db_connection(autocommit=True) as connection:
         cursor = connection.cursor()
-        cursor.execute(count_sql, params)
-        total_count = int(cursor.fetchone()[0])
-        cursor.execute(data_sql, params)
-        items = [_serialize_row(row) for row in rows_to_dicts(cursor)]
+        last_error: Exception | None = None
+        for item_base_cte in ITEM_BASE_CTES:
+            count_sql = f"""
+            {item_base_cte}
+            SELECT COUNT(*) AS totalCount
+            FROM ItemBase
+            WHERE itemCode LIKE %(item_code_pattern)s
+              AND itemName LIKE %(item_name_pattern)s
+              AND (
+                %(search_filter)s = ''
+                OR itemCode LIKE %(search_pattern)s
+                OR itemName LIKE %(search_pattern)s
+              );
+            """
+
+            data_sql = f"""
+            {item_base_cte}
+            SELECT
+                itemMasterCode,
+                itemCode,
+                itemCode AS qrCode,
+                itemName,
+                itemGroup,
+                itemQuantity,
+                itemQuantityValue,
+                hsnCode,
+                sellingRateHint,
+                costRateHint,
+                priceCount,
+                minFinalPrice,
+                maxFinalPrice
+            FROM ItemBase
+            WHERE itemCode LIKE %(item_code_pattern)s
+              AND itemName LIKE %(item_name_pattern)s
+              AND (
+                %(search_filter)s = ''
+                OR itemCode LIKE %(search_pattern)s
+                OR itemName LIKE %(search_pattern)s
+              )
+            ORDER BY itemName ASC, itemMasterCode ASC
+            OFFSET %(offset)s ROWS FETCH NEXT %(page_size)s ROWS ONLY;
+            """
+
+            try:
+                cursor.execute(count_sql, params)
+                total_count = int(cursor.fetchone()[0])
+                cursor.execute(data_sql, params)
+                items = [_serialize_row(row) for row in rows_to_dicts(cursor)]
+                break
+            except Exception as error:
+                last_error = error
+        else:
+            assert last_error is not None
+            raise last_error
 
         support_codes_by_item = _load_support_codes_for_items(
             cursor,
@@ -624,29 +717,39 @@ def _build_item_detail(cursor: Any, item_lookup: str) -> tuple[dict[str, Any] | 
     if not reference:
         return None, None
 
-    cursor.execute(
-        f"""
-        {ITEM_BASE_CTE}
-        SELECT TOP 1
-            itemMasterCode,
-            itemCode,
-            itemCode AS qrCode,
-            itemName,
-            itemGroup,
-            itemQuantity,
-            itemQuantityValue,
-            hsnCode,
-            sellingRateHint,
-            costRateHint,
-            priceCount,
-            minFinalPrice,
-            maxFinalPrice
-        FROM ItemBase
-        WHERE itemMasterCode = %(item_master_code)s;
-        """,
-        {"item_master_code": reference["itemMasterCode"]},
-    )
-    header_rows = rows_to_dicts(cursor)
+    last_error: Exception | None = None
+    for item_base_cte in ITEM_BASE_CTES:
+        try:
+            cursor.execute(
+                f"""
+                {item_base_cte}
+                SELECT TOP 1
+                    itemMasterCode,
+                    itemCode,
+                    itemCode AS qrCode,
+                    itemName,
+                    itemGroup,
+                    itemQuantity,
+                    itemQuantityValue,
+                    hsnCode,
+                    sellingRateHint,
+                    costRateHint,
+                    priceCount,
+                    minFinalPrice,
+                    maxFinalPrice
+                FROM ItemBase
+                WHERE itemMasterCode = %(item_master_code)s;
+                """,
+                {"item_master_code": reference["itemMasterCode"]},
+            )
+            header_rows = rows_to_dicts(cursor)
+            break
+        except Exception as error:
+            last_error = error
+    else:
+        assert last_error is not None
+        raise last_error
+
     if not header_rows:
         return None, None
 

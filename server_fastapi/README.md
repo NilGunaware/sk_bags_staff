@@ -151,7 +151,7 @@ The updater uses:
 - `itemCode` comes from `Master1.Alias` when available
 - fallback item code uses `MasterSupport.C1`, then `Master1.Code`
 - `itemName` comes from `Master1.Name`
-- `itemQuantity` comes from aggregated `Folio1.D1`
+- `itemQuantity` comes from the branch-wise stock total used for Busy stock status
 - item-level QR code is not available in the current database, so `qrCode` is returned as `null`
 - orders are stored in:
   - `dbo.ApiOrders`

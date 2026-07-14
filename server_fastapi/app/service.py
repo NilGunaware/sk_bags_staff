@@ -21,7 +21,7 @@ WITH StockAgg AS (
     INNER JOIN dbo.Tran1 v
         ON v.VchCode = t.VchCode
     WHERE t.RecType = 0
-      AND CAST(v.[Date] AS DATE) <= CAST(GETDATE() AS DATE)
+      AND v.[Date] < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
     GROUP BY t.MasterCode1
 ),
 PriceAgg AS (
@@ -383,7 +383,7 @@ def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, An
             WHERE b.MasterType = 11
               AND (
                 t.VchCode IS NULL
-                OR CAST(v.[Date] AS DATE) <= CAST(GETDATE() AS DATE)
+                OR v.[Date] < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
               )
             GROUP BY b.Code, b.Name
             ORDER BY b.Code ASC;
@@ -410,6 +410,11 @@ def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, An
             {"item_master_code": item_master_code},
         )
     return [_serialize_row(row) for row in rows_to_dicts(cursor)]
+
+
+def _apply_branch_stock_totals(item: dict[str, Any], branch_stocks: list[dict[str, Any]]) -> None:
+    item["itemQuantity"] = sum(float(branch.get("itemQuantity") or 0) for branch in branch_stocks)
+    item["itemQuantityValue"] = sum(float(branch.get("itemQuantityValue") or 0) for branch in branch_stocks)
 
 
 def _load_price_category_names(cursor: Any) -> dict[int, str]:
@@ -587,6 +592,13 @@ def list_items(*, search: str, item_code: str, item_name: str, qr_code: str, off
             [int(item.get("itemMasterCode") or 0) for item in items],
         )
 
+        for item in items:
+            item_master_code = int(item.get("itemMasterCode") or 0)
+            if item_master_code <= 0:
+                continue
+            branch_stocks = _load_branch_stocks(cursor, item_master_code)
+            _apply_branch_stock_totals(item, branch_stocks)
+
     for item in items:
         support_codes = support_codes_by_item.get(
             int(item.get("itemMasterCode") or 0),
@@ -755,6 +767,7 @@ def _build_item_detail(cursor: Any, item_lookup: str) -> tuple[dict[str, Any] | 
 
     header = _serialize_row(header_rows[0])
     branch_stocks = _load_branch_stocks(cursor, int(reference["itemMasterCode"]))
+    _apply_branch_stock_totals(header, branch_stocks)
 
     cursor.execute(
         """

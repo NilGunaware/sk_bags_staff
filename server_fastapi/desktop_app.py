@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import logging
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -29,7 +31,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from app.config import settings
-from app.db import assert_database_reachable_for_startup
+from app.db import assert_database_reachable_for_startup, get_connection, rows_to_dicts
 from app.main import app
 from app.runtime import env_example_path, env_path
 from app.service import ensure_order_schema
@@ -51,6 +53,15 @@ LICENSE_CHECK_URL = "https://interlinkpos.com/sk_bags/isactive"
 LICENSE_CHECK_TIMEOUT = 6.0
 LICENSE_IS_ACTIVE: bool | None = None
 LICENSE_LAST_RESPONSE = ""
+PUBLIC_IP_CHECK_TIMEOUT = 4.0
+PUBLIC_IP_CHECK_URLS = (
+    "https://api.ipify.org",
+    "https://ifconfig.me/ip",
+)
+PUBLIC_IP_PORT_RULES = {
+    "182.70.120.80": ("SK ENTERPRISE", "8008"),
+    "150.107.237.206": ("SS MOVE ON THRILL BAGS LLP", "8009"),
+}
 
 
 def _env_bool(value: str | bool | None, default: bool = False) -> bool:
@@ -133,6 +144,28 @@ def _request_json(url: str, timeout: float) -> dict[str, object]:
     return decoded
 
 
+def _public_ip_from_text(value: str) -> str:
+    candidate = value.strip().split()[0]
+    ipaddress.ip_address(candidate)
+    return candidate
+
+
+def fetch_public_ip() -> str:
+    last_error: Exception | None = None
+    for url in PUBLIC_IP_CHECK_URLS:
+        request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
+        try:
+            with urllib.request.urlopen(request, timeout=PUBLIC_IP_CHECK_TIMEOUT) as response:
+                raw_value = response.read().decode("utf-8", errors="ignore")
+            return _public_ip_from_text(raw_value)
+        except Exception as error:
+            last_error = error
+
+    if last_error is None:
+        raise RuntimeError("No public IP check URL is configured.")
+    raise RuntimeError(str(last_error)) from last_error
+
+
 def _download_file(url: str, destination: Path) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
     with urllib.request.urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT) as response:
@@ -166,6 +199,49 @@ del "%~f0" >nul 2>&1
     return script_path
 
 
+def _busy_database_sort_key(name: str) -> tuple[int, int, str]:
+    match = re.search(r"BusyComp(\d+)_db(\d+)$", name, flags=re.IGNORECASE)
+    if not match:
+        return (0, 0, name.lower())
+    company_code = int(match.group(1))
+    year_code = int(match.group(2))
+    return (year_code, company_code, name.lower())
+
+
+def discover_busy_databases(connection_values: dict[str, str]) -> list[str]:
+    db_port = int(connection_values["DB_PORT"])
+    connection = get_connection(
+        autocommit=True,
+        timeout=settings.db_startup_timeout,
+        login_timeout=settings.db_startup_timeout,
+        database="master",
+        server=connection_values["DB_HOST"],
+        port=db_port,
+        user=connection_values["DB_USER"],
+        password=connection_values["DB_PASSWORD"],
+    )
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            SELECT name
+            FROM sys.databases
+            WHERE name LIKE 'BusyComp%[_]db%'
+              AND state_desc = 'ONLINE'
+            ORDER BY name;
+            """
+        )
+        names = [
+            str(row["name"])
+            for row in rows_to_dicts(cursor)
+            if str(row.get("name") or "").strip()
+        ]
+    finally:
+        connection.close()
+
+    return sorted(names, key=_busy_database_sort_key, reverse=True)
+
+
 class LocalEnvStore:
     KEY_ORDER = [
         "IS_DEBUG",
@@ -180,6 +256,7 @@ class LocalEnvStore:
         "DEFAULT_PAGE_SIZE",
         "MAX_PAGE_SIZE",
         "DEBUG",
+        "AUTO_PORT_BY_PUBLIC_IP",
         "AUTO_UPDATE",
         "UPDATE_MANIFEST_URL",
     ]
@@ -208,6 +285,12 @@ class LocalEnvStore:
         values = self.load_values()
         effective = self.effective_connection_values(values)
         return all(effective.get(key, "").strip() for key in ["DB_HOST", "DB_PORT", "DB_USER", "DB_NAME"])
+
+    def has_saved_service_port(self) -> bool:
+        if not env_path().exists():
+            return False
+        saved_values = self._read_env_file(env_path())
+        return bool(saved_values.get("PORT", "").strip())
 
     def is_debug_mode(self, values: dict[str, str] | None = None) -> bool:
         source_values = values or self.load_values()
@@ -248,6 +331,8 @@ class LocalEnvStore:
             values["DEFAULT_PAGE_SIZE"] = str(settings.default_page_size)
         if "MAX_PAGE_SIZE" not in values:
             values["MAX_PAGE_SIZE"] = str(settings.max_page_size)
+        if "AUTO_PORT_BY_PUBLIC_IP" not in values:
+            values["AUTO_PORT_BY_PUBLIC_IP"] = "true"
         if "AUTO_UPDATE" not in values:
             values["AUTO_UPDATE"] = "true"
         if "UPDATE_MANIFEST_URL" not in values:
@@ -543,6 +628,7 @@ class DesktopApp:
         self.server_manager = ServerManager(self.log_queue)
         self.license_control_widgets: list[ttk.Widget] = []
         self.is_update_check_running = False
+        self.is_db_detect_running = False
 
         self.status_var = tk.StringVar(value="Preparing...")
         self.url_var = tk.StringVar(value=self.server_manager.base_url)
@@ -561,6 +647,7 @@ class DesktopApp:
         self.db_name_var = tk.StringVar()
 
         self._load_connection_form()
+        self._auto_apply_public_ip_port()
         self._build_ui()
         self._check_license_status_on_start()
         self.root.protocol("WM_DELETE_WINDOW", self.stop_and_exit)
@@ -832,6 +919,14 @@ class DesktopApp:
         )
         save_button.pack(side="left", padx=(10, 0))
         self._register_license_widget(save_button)
+        self.detect_db_button = ttk.Button(
+            action_row,
+            text="Detect Latest DB",
+            style="Secondary.TButton",
+            command=self.detect_latest_database,
+        )
+        self.detect_db_button.pack(side="left", padx=(10, 0))
+        self._register_license_widget(self.detect_db_button)
         reconnect_button = ttk.Button(
             action_row,
             text="Reconnect",
@@ -1018,6 +1113,44 @@ class DesktopApp:
         self._update_connection_summary()
         if self.env_store.is_debug_mode(values):
             self.connection_note_var.set("Debug mode is enabled. Using default credentials from .env.example.")
+
+    def _auto_apply_public_ip_port(self) -> None:
+        values = self.env_store.load_values()
+        if not _env_bool(values.get("AUTO_PORT_BY_PUBLIC_IP"), True):
+            self.server_manager.log("Public IP port auto-detect is disabled.")
+            return
+
+        current_port = self.service_port_var.get().strip() or "8000"
+        if self.env_store.has_saved_service_port():
+            self.server_manager.log(f"Saved service port {current_port} found. Public IP auto-detect skipped.")
+            return
+
+        try:
+            public_ip = fetch_public_ip()
+        except Exception as error:
+            self.server_manager.log(f"Could not detect public IP for service port: {error}")
+            return
+
+        rule = PUBLIC_IP_PORT_RULES.get(public_ip)
+        if rule is None:
+            self.server_manager.log(
+                f"Public IP {public_ip} has no service port rule. Keeping port {current_port}."
+            )
+            return
+
+        company_name, detected_port = rule
+        if current_port == detected_port:
+            self.server_manager.log(
+                f"Public IP {public_ip} matched {company_name}. Service port is already {detected_port}."
+            )
+            return
+
+        self.service_port_var.set(detected_port)
+        self._apply_runtime_connection_values(self._collect_connection_values())
+        self._update_connection_summary()
+        self.server_manager.log(
+            f"Public IP {public_ip} matched {company_name}. Auto-set service port to {detected_port}."
+        )
 
     def _update_connection_summary(self) -> None:
         host = self.db_host_var.get().strip() or "-"
@@ -1283,6 +1416,65 @@ class DesktopApp:
                 f"Saved service port {settings.port} and database settings for "
                 f"{settings.db_host}:{settings.db_port}/{settings.db_name} locally."
             )
+
+    def detect_latest_database(self) -> None:
+        if LICENSE_IS_ACTIVE is not True:
+            self.server_manager.log("Detect Latest DB is blocked because the licence is expired.")
+            return
+        if self.is_db_detect_running:
+            self.server_manager.log("Database detection is already running.")
+            return
+
+        try:
+            values = self._collect_connection_values()
+            self._validate_connection_values({**values, "DB_NAME": values.get("DB_NAME") or "master"})
+        except Exception as error:
+            self.connection_note_var.set(str(error))
+            self.server_manager.log(str(error))
+            return
+
+        self.is_db_detect_running = True
+        self.detect_db_button.state(["disabled"])
+        self.connection_note_var.set("Detecting latest Busy database...")
+        self.server_manager.log(
+            f"Detecting Busy databases on {values['DB_HOST']}:{values['DB_PORT']}..."
+        )
+
+        thread = threading.Thread(
+            target=self._detect_latest_database_worker,
+            args=(values,),
+            daemon=True,
+        )
+        thread.start()
+
+    def _detect_latest_database_worker(self, values: dict[str, str]) -> None:
+        try:
+            databases = discover_busy_databases(values)
+            if not databases:
+                raise RuntimeError("No online BusyComp*_db* databases were found.")
+            latest = databases[0]
+            self.root.after(
+                0,
+                lambda: self._apply_detected_database(latest, databases),
+            )
+        except Exception as error:
+            message = f"Database detection failed: {error}"
+            self.root.after(0, lambda: self._finish_database_detection(message))
+
+    def _apply_detected_database(self, latest: str, databases: list[str]) -> None:
+        self.db_name_var.set(latest)
+        self._finish_database_detection(
+            f"Detected latest database: {latest}. Click Save or Reconnect to use it."
+        )
+        preview = ", ".join(databases[:6])
+        more = "" if len(databases) <= 6 else f" (+{len(databases) - 6} more)"
+        self.server_manager.log(f"Detected Busy databases: {preview}{more}")
+
+    def _finish_database_detection(self, message: str) -> None:
+        self.is_db_detect_running = False
+        self.detect_db_button.state(["!disabled"])
+        self.connection_note_var.set(message)
+        self.server_manager.log(message)
 
     def start_server_only(self) -> None:
         if not self.env_store.has_saved_connection():

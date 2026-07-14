@@ -551,26 +551,12 @@ class LocalItemSyncService extends GetxService {
               )
               .toList()
         : const <BranchStockModel>[];
-    final branchQuantity = branchStocks.fold<double>(
-      0,
-      (sum, branch) => sum + branch.quantity,
-    );
-    final branchQuantityValue = branchStocks.fold<double>(
-      0,
-      (sum, branch) => sum + branch.quantityValue,
-    );
-    final apiQuantity = _parseDouble(
+    final serverQuantity = _parseDouble(
       json['itemQuantity'] ?? json['quantity'] ?? json['qty'],
     );
-    final apiQuantityValue = _parseDouble(
+    final serverQuantityValue = _parseDouble(
       json['itemQuantityValue'] ?? json['item_quantity_value'],
     );
-    final serverQuantity = branchStocks.isNotEmpty
-        ? branchQuantity
-        : apiQuantity;
-    final serverQuantityValue = branchStocks.isNotEmpty
-        ? branchQuantityValue
-        : apiQuantityValue;
 
     return MergedItemDetailModel(
       itemMasterCode: _parseInt(

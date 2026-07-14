@@ -47,7 +47,13 @@ The desktop app will:
 - when `IS_DEBUG=true`, use the default credentials from `.env.example`
 - when `IS_DEBUG=false`, use the saved or entered values from `.env`
 - let you enter the database host/IP, port, username, password, and database name
+- let you click `Detect Latest DB` to scan SQL Server for online `BusyComp*_db*` databases and fill the latest year database automatically
+- still allow manual database name entry when you need a specific company/year database
 - let you set the API service port, defaulting to `8000`
+- auto-detect the router/public IP on startup and set the service port for known sites:
+  - `182.70.120.80` -> SK ENTERPRISE -> `8008`
+  - `150.107.237.206` -> SS MOVE ON THRILL BAGS LLP -> `8009`
+- skip service port auto-detect when a port is already saved in `.env`
 - save those values locally in `server_fastapi/.env`
 - call `https://interlinkpos.com/sk_bags/isactive` on startup and store the result in the launcher
 - block service startup and disable launcher controls if the licence response is `0`
@@ -77,6 +83,21 @@ Behavior:
   - saved custom DB settings stay in `.env`, but runtime still uses the debug defaults
 - `IS_DEBUG=false`
   - the launcher uses the saved or entered values from `.env`
+
+### Public IP Port Auto-Detect
+
+The launcher can select the API service port from the router/public IP because the static IP belongs to the router, not the local desktop machine.
+
+```env
+AUTO_PORT_BY_PUBLIC_IP=true
+```
+
+Current rules:
+
+- `182.70.120.80` starts on port `8008`
+- `150.107.237.206` starts on port `8009`
+
+If `PORT` is already saved in `.env`, the launcher keeps that saved port and skips public IP auto-detect. If the public IP check fails or the public IP is unknown, the launcher keeps the entered/default port.
 
 ## Windows EXE Build
 

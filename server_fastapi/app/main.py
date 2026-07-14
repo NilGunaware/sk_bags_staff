@@ -38,6 +38,7 @@ from .service import (
     list_orders,
     list_price_categories,
 )
+from .version import APP_VERSION
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -59,7 +60,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="SK Bags FastAPI Service",
-    version="1.0.0",
+    version=APP_VERSION,
     description=(
         "FastAPI service for the recent BUSY database `BusyComp0019_db12026`. "
         "Use `/docs` for Swagger UI and `/redoc` for ReDoc."

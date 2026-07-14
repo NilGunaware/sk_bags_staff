@@ -14,15 +14,20 @@ def get_connection(
     autocommit: bool = False,
     timeout: int | None = None,
     login_timeout: int | None = None,
+    database: str | None = None,
+    server: str | None = None,
+    port: int | None = None,
+    user: str | None = None,
+    password: str | None = None,
 ) -> pytds.Connection:
     effective_timeout = timeout if timeout is not None else settings.db_timeout
     effective_login_timeout = login_timeout if login_timeout is not None else settings.db_timeout
     return pytds.connect(
-        server=settings.db_host,
-        port=settings.db_port,
-        database=settings.db_name,
-        user=settings.db_user,
-        password=settings.db_password,
+        server=server or settings.db_host,
+        port=port or settings.db_port,
+        database=database or settings.db_name,
+        user=user or settings.db_user,
+        password=settings.db_password if password is None else password,
         timeout=effective_timeout,
         login_timeout=effective_login_timeout,
         autocommit=autocommit,

@@ -58,17 +58,18 @@ jobs:
 
       - name: Generate update manifest
         run: |
-          EXE_PATH="server_fastapi/dist/SKBagsDesktop.exe"
+          EXE_NAME="SKBagsDesktop-${{ steps.version.outputs.version }}.exe"
+          EXE_PATH="server_fastapi/dist/${EXE_NAME}"
           SHA256="$(sha256sum "$EXE_PATH" | awk '{print $1}')"
-          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.version.outputs.tag }}/SKBagsDesktop.exe"
-          printf '{\n  "version": "%s",\n  "url": "%s",\n  "sha256": "%s"\n}\n' "${{ steps.version.outputs.version }}" "$DOWNLOAD_URL" "$SHA256" > server_fastapi/dist/latest.json
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.version.outputs.tag }}/${EXE_NAME}"
+          printf '{\n  "version": "%s",\n  "url": "%s",\n  "sha256": "%s",\n  "fileName": "%s"\n}\n' "${{ steps.version.outputs.version }}" "$DOWNLOAD_URL" "$SHA256" "$EXE_NAME" > server_fastapi/dist/latest.json
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: SKBagsDesktop-windows
           path: |
-            server_fastapi/dist/SKBagsDesktop.exe
+            server_fastapi/dist/SKBagsDesktop-${{ steps.version.outputs.version }}.exe
             server_fastapi/dist/latest.json
 
       - name: Publish GitHub release
@@ -78,5 +79,5 @@ jobs:
           name: SK Bags Desktop ${{ steps.version.outputs.version }}
           make_latest: true
           files: |
-            server_fastapi/dist/SKBagsDesktop.exe
+            server_fastapi/dist/SKBagsDesktop-${{ steps.version.outputs.version }}.exe
             server_fastapi/dist/latest.json

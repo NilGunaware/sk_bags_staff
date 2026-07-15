@@ -213,6 +213,11 @@ def items_page() -> FileResponse:
     return _page("items.html")
 
 
+@app.get("/stock", include_in_schema=False)
+def stock_page() -> FileResponse:
+    return _page("stock.html")
+
+
 @app.get("/api/meta", response_model=RootResponse, tags=["Meta"])
 def api_meta() -> RootResponse:
     return RootResponse(
@@ -226,6 +231,7 @@ def api_meta() -> RootResponse:
             "GET /api/items",
             "GET /api/items/detail/{item_lookup}",
             "GET /api/items/detail/{item_lookup}/image",
+            "GET /stock",
             "GET /api/price-categories",
             "POST /api/orders",
             "GET /api/orders",

@@ -3,6 +3,9 @@
 from pathlib import Path
 
 project_root = Path.cwd()
+version_namespace = {}
+exec((project_root / "app" / "version.py").read_text(encoding="utf-8"), version_namespace)
+app_version = version_namespace["APP_VERSION"]
 
 datas = [
     (str(project_root / ".env.example"), "."),
@@ -40,7 +43,7 @@ exe = EXE(
     a.datas,
     [],
     exclude_binaries=False,
-    name="SKBagsDesktop",
+    name=f"SKBagsDesktop-{app_version}",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

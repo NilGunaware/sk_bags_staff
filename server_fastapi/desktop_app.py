@@ -166,11 +166,20 @@ def fetch_public_ip() -> str:
     raise RuntimeError(str(last_error)) from last_error
 
 
-def _download_file(url: str, destination: Path) -> None:
+def _download_file(url: str, destination: Path, progress_callback: Any | None = None) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
     with urllib.request.urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT) as response:
+        content_length = int(response.headers.get("content-length") or 0)
+        downloaded = 0
         with destination.open("wb") as output:
-            shutil.copyfileobj(response, output)
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+                downloaded += len(chunk)
+                if progress_callback is not None:
+                    progress_callback(downloaded, content_length)
 
 
 def _running_executable_path() -> Path:
@@ -179,32 +188,51 @@ def _running_executable_path() -> Path:
     return Path(__file__).resolve()
 
 
-def _write_update_script(new_exe: Path, target_exe: Path, pid: int) -> Path:
+def _versioned_exe_name(version: str) -> str:
+    safe_version = re.sub(r"[^0-9A-Za-z_.-]+", "-", version.strip() or "unknown")
+    return f"SKBagsDesktop-{safe_version}.exe"
+
+
+def _write_update_script(new_exe: Path, target_exe: Path, current_exe: Path, pid: int) -> Path:
     script_path = Path(tempfile.gettempdir()) / f"skbags_update_{int(time.time())}.bat"
+    log_path = target_exe.parent / "SKBagsDesktop-update.log"
     script = f"""@echo off
 setlocal
 set "NEW_EXE={new_exe}"
 set "TARGET_EXE={target_exe}"
+set "CURRENT_EXE={current_exe}"
+set "UPDATE_LOG={log_path}"
+
+echo [%date% %time%] Waiting for old app PID {pid}.>"%UPDATE_LOG%"
 
 for /l %%i in (1,1,30) do (
   tasklist /FI "PID eq {pid}" | find "{pid}" >nul
   if errorlevel 1 goto replace
+  echo [%date% %time%] Old app still running, wait %%i.>>"%UPDATE_LOG%"
   timeout /t 1 /nobreak >nul
 )
 
+echo [%date% %time%] Forcing old app PID {pid} to close.>>"%UPDATE_LOG%"
 taskkill /PID {pid} /F >nul 2>&1
 timeout /t 2 /nobreak >nul
 
 :replace
+echo [%date% %time%] Copying "%NEW_EXE%" to "%TARGET_EXE%".>>"%UPDATE_LOG%"
 copy /Y "{new_exe}" "{target_exe}" >nul
 if errorlevel 1 (
+  echo [%date% %time%] Update failed. Could not replace executable.>>"%UPDATE_LOG%"
   echo Update failed. Could not replace executable.
   pause
   exit /b 1
 )
+echo [%date% %time%] Starting "%TARGET_EXE%".>>"%UPDATE_LOG%"
 start "" "{target_exe}"
 timeout /t 8 /nobreak >nul
+if /I not "%CURRENT_EXE%"=="%TARGET_EXE%" (
+  echo [%date% %time%] Leaving old executable in place: "%CURRENT_EXE%".>>"%UPDATE_LOG%"
+)
 del "{new_exe}" >nul 2>&1
+echo [%date% %time%] Update script complete.>>"%UPDATE_LOG%"
 del "%~f0" >nul 2>&1
 """
     script_path.write_text(script, encoding="utf-8")
@@ -1344,20 +1372,45 @@ class DesktopApp:
 
     def _install_update_worker(self, latest_version: str, download_url: str, sha256: str) -> None:
         try:
-            target_exe = _running_executable_path()
+            current_exe = _running_executable_path()
             if not getattr(sys, "frozen", False):
                 raise RuntimeError(
                     "Updater can install only from the packaged Windows EXE."
                 )
 
-            download_path = Path(tempfile.gettempdir()) / f"SKBagsDesktop-{latest_version}.exe"
-            _download_file(download_url, download_path)
+            target_exe = current_exe.parent / _versioned_exe_name(latest_version)
+            download_path = Path(tempfile.gettempdir()) / _versioned_exe_name(latest_version)
+
+            self.root.after(
+                0,
+                lambda: self._set_update_progress(f"Downloading update {latest_version}..."),
+            )
+            _download_file(
+                download_url,
+                download_path,
+                progress_callback=lambda downloaded, total: self.root.after(
+                    0,
+                    lambda downloaded=downloaded, total=total: self._set_download_progress(
+                        latest_version,
+                        downloaded,
+                        total,
+                    ),
+                ),
+            )
+            self.root.after(
+                0,
+                lambda: self._set_update_progress(f"Verifying update {latest_version}..."),
+            )
             actual_sha256 = _sha256_file(download_path)
             if actual_sha256.lower() != sha256.lower():
                 download_path.unlink(missing_ok=True)
                 raise RuntimeError("Downloaded update checksum did not match.")
 
-            script_path = _write_update_script(download_path, target_exe, os.getpid())
+            self.root.after(
+                0,
+                lambda: self._set_update_progress(f"Preparing update {latest_version}..."),
+            )
+            script_path = _write_update_script(download_path, target_exe, current_exe, os.getpid())
             self.root.after(
                 0,
                 lambda: self._launch_update_script(script_path, latest_version),
@@ -1369,9 +1422,21 @@ class DesktopApp:
                 lambda: self._finish_update_check(message),
             )
 
+    def _set_update_progress(self, message: str) -> None:
+        self.update_status_var.set(message)
+        self.server_manager.log(message)
+
+    def _set_download_progress(self, latest_version: str, downloaded: int, total: int) -> None:
+        if total > 0:
+            percent = min(100, int((downloaded / total) * 100))
+            message = f"Downloading update {latest_version}: {percent}%"
+        else:
+            message = f"Downloading update {latest_version}: {downloaded // (1024 * 1024)} MB"
+        self.update_status_var.set(message)
+
     def _launch_update_script(self, script_path: Path, latest_version: str) -> None:
-        self.update_status_var.set(f"Installing update {latest_version}...")
-        self.server_manager.log(f"Installing update {latest_version}. The app will restart.")
+        self.update_status_var.set(f"Installing update {latest_version}. App will restart...")
+        self.server_manager.log(f"Installing update {latest_version}. The app will restart into a versioned EXE.")
         try:
             creation_flags = 0
             if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):

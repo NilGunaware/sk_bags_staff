@@ -14,16 +14,41 @@ from .db import db_connection, rows_to_dicts
 ITEM_BASE_CTE_DATED_STOCK = """
 WITH StockAgg AS (
     SELECT
-        t.MasterCode1 AS MasterCode,
-        SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
-        SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
-    FROM dbo.Tran4 t
-    INNER JOIN dbo.Tran1 v
-        ON v.VchCode = t.VchCode
-    WHERE t.RecType = 0
-      AND v.[Date] >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
-      AND v.[Date] < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
-    GROUP BY t.MasterCode1
+        MasterCode,
+        SUM(itemQuantity) AS itemQuantity,
+        SUM(itemQuantityValue) AS itemQuantityValue
+    FROM (
+        SELECT
+            t.MasterCode1 AS MasterCode,
+            CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2)) AS itemQuantity,
+            CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2)) AS itemQuantityValue
+        FROM dbo.Tran4 t
+        LEFT JOIN dbo.Tran1 v
+            ON v.VchCode = t.SrNo
+        WHERE t.RecType = 0
+          AND (
+            v.VchCode IS NULL
+            OR (ISNULL(v.VchCancelled, 0) = 0 AND ISNULL(v.Cancelled, 0) = 0)
+          )
+
+        UNION ALL
+
+        SELECT
+            t.MasterCode1 AS MasterCode,
+            CAST(ISNULL(t.Value1, 0) AS DECIMAL(18, 2)) AS itemQuantity,
+            CAST(ISNULL(t.Value3, 0) AS DECIMAL(18, 2)) AS itemQuantityValue
+        FROM dbo.Tran2 t
+        LEFT JOIN dbo.Tran1 v
+            ON v.VchCode = t.VchCode
+        WHERE t.Date >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
+          AND t.Date < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
+          AND t.VchType <> 26
+          AND (
+            v.VchCode IS NULL
+            OR (ISNULL(v.VchCancelled, 0) = 0 AND ISNULL(v.Cancelled, 0) = 0)
+          )
+    ) StockLines
+    GROUP BY MasterCode
 ),
 PriceAgg AS (
     SELECT
@@ -371,17 +396,43 @@ def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, An
             """
             WITH BranchStockAgg AS (
                 SELECT
-                    t.MasterCode2 AS branchCode,
-                    SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
-                    SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
-                FROM dbo.Tran4 t
-                INNER JOIN dbo.Tran1 v
-                    ON v.VchCode = t.VchCode
-                WHERE t.RecType = 0
-                  AND t.MasterCode1 = %(item_master_code)s
-                  AND v.[Date] >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
-                  AND v.[Date] < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
-                GROUP BY t.MasterCode2
+                    branchCode,
+                    SUM(itemQuantity) AS itemQuantity,
+                    SUM(itemQuantityValue) AS itemQuantityValue
+                FROM (
+                    SELECT
+                        t.MasterCode2 AS branchCode,
+                        CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2)) AS itemQuantity,
+                        CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2)) AS itemQuantityValue
+                    FROM dbo.Tran4 t
+                    LEFT JOIN dbo.Tran1 v
+                        ON v.VchCode = t.SrNo
+                    WHERE t.RecType = 0
+                      AND t.MasterCode1 = %(item_master_code)s
+                      AND (
+                        v.VchCode IS NULL
+                        OR (ISNULL(v.VchCancelled, 0) = 0 AND ISNULL(v.Cancelled, 0) = 0)
+                      )
+
+                    UNION ALL
+
+                    SELECT
+                        t.MasterCode2 AS branchCode,
+                        CAST(ISNULL(t.Value1, 0) AS DECIMAL(18, 2)) AS itemQuantity,
+                        CAST(ISNULL(t.Value3, 0) AS DECIMAL(18, 2)) AS itemQuantityValue
+                    FROM dbo.Tran2 t
+                    LEFT JOIN dbo.Tran1 v
+                        ON v.VchCode = t.VchCode
+                    WHERE t.MasterCode1 = %(item_master_code)s
+                      AND t.Date >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
+                      AND t.Date < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
+                      AND t.VchType <> 26
+                      AND (
+                        v.VchCode IS NULL
+                        OR (ISNULL(v.VchCancelled, 0) = 0 AND ISNULL(v.Cancelled, 0) = 0)
+                      )
+                ) StockLines
+                GROUP BY branchCode
             )
             SELECT
                 b.Code AS branchCode,

@@ -21,6 +21,7 @@ WITH StockAgg AS (
     INNER JOIN dbo.Tran1 v
         ON v.VchCode = t.VchCode
     WHERE t.RecType = 0
+      AND v.[Date] >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
       AND v.[Date] < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
     GROUP BY t.MasterCode1
 ),
@@ -368,24 +369,29 @@ def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, An
     try:
         cursor.execute(
             """
+            WITH BranchStockAgg AS (
+                SELECT
+                    t.MasterCode2 AS branchCode,
+                    SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))) AS itemQuantity,
+                    SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))) AS itemQuantityValue
+                FROM dbo.Tran4 t
+                INNER JOIN dbo.Tran1 v
+                    ON v.VchCode = t.VchCode
+                WHERE t.RecType = 0
+                  AND t.MasterCode1 = %(item_master_code)s
+                  AND v.[Date] >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
+                  AND v.[Date] < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
+                GROUP BY t.MasterCode2
+            )
             SELECT
                 b.Code AS branchCode,
                 b.Name AS branchName,
-                COALESCE(SUM(CAST(ISNULL(t.D1, 0) AS DECIMAL(18, 2))), 0) AS itemQuantity,
-                COALESCE(SUM(CAST(ISNULL(t.D3, 0) AS DECIMAL(18, 2))), 0) AS itemQuantityValue
+                COALESCE(sa.itemQuantity, 0) AS itemQuantity,
+                COALESCE(sa.itemQuantityValue, 0) AS itemQuantityValue
             FROM dbo.Master1 b
-            LEFT JOIN dbo.Tran4 t
-                ON t.MasterCode2 = b.Code
-               AND t.RecType = 0
-               AND t.MasterCode1 = %(item_master_code)s
-            LEFT JOIN dbo.Tran1 v
-                ON v.VchCode = t.VchCode
+            LEFT JOIN BranchStockAgg sa
+                ON sa.branchCode = b.Code
             WHERE b.MasterType = 11
-              AND (
-                t.VchCode IS NULL
-                OR v.[Date] < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
-              )
-            GROUP BY b.Code, b.Name
             ORDER BY b.Code ASC;
             """,
             {"item_master_code": item_master_code},

@@ -236,7 +236,7 @@ def api_meta() -> RootResponse:
 
 @app.get("/health", response_model=HealthResponse, tags=["Meta"])
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", database=settings.db_name)
+    return HealthResponse(status="ok", database=settings.db_name, version=APP_VERSION)
 
 
 @app.get(

@@ -18,6 +18,7 @@ class RootResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     database: str
+    version: str
 
 
 class PaginationMeta(BaseModel):

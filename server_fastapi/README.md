@@ -131,6 +131,8 @@ It will build the Windows desktop package on `windows-latest`, upload it as an a
 
 Release builds include an auto-updater. On startup, the desktop app checks `latest.json`; when a newer version is found, it downloads the new EXE, verifies the SHA-256 checksum, stops the current app, replaces the EXE, and opens the new version.
 
+The Windows package is built without UPX compression to avoid PyInstaller runtime DLL load failures on client machines.
+
 Manual release:
 
 1. Open GitHub Actions.

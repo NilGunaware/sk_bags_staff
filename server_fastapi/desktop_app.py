@@ -183,8 +183,19 @@ def _write_update_script(new_exe: Path, target_exe: Path, pid: int) -> Path:
     script_path = Path(tempfile.gettempdir()) / f"skbags_update_{int(time.time())}.bat"
     script = f"""@echo off
 setlocal
+set "NEW_EXE={new_exe}"
+set "TARGET_EXE={target_exe}"
+
+for /l %%i in (1,1,30) do (
+  tasklist /FI "PID eq {pid}" | find "{pid}" >nul
+  if errorlevel 1 goto replace
+  timeout /t 1 /nobreak >nul
+)
+
+taskkill /PID {pid} /F >nul 2>&1
 timeout /t 2 /nobreak >nul
-taskkill /PID {pid} /T /F >nul 2>&1
+
+:replace
 copy /Y "{new_exe}" "{target_exe}" >nul
 if errorlevel 1 (
   echo Update failed. Could not replace executable.
@@ -192,6 +203,7 @@ if errorlevel 1 (
   exit /b 1
 )
 start "" "{target_exe}"
+timeout /t 8 /nobreak >nul
 del "{new_exe}" >nul 2>&1
 del "%~f0" >nul 2>&1
 """

@@ -43,7 +43,13 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           if [ -z "$VERSION" ]; then
-            VERSION="1.0.${{ github.run_number }}"
+            VERSION="$(python - <<'PY'
+from pathlib import Path
+namespace = {}
+exec(Path("server_fastapi/app/version.py").read_text(encoding="utf-8"), namespace)
+print(namespace["APP_VERSION"])
+PY
+)"
           fi
           TAG="desktop-v${VERSION}"
           MANIFEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/latest.json"

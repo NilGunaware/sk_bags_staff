@@ -1,6 +1,7 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/services/repair_service.dart';
 import '../../core/utils/api_response_handler.dart';
@@ -8,6 +9,7 @@ import '../../data/models/repair_models.dart';
 
 class RepairCreateController extends GetxController {
   final RepairService _repairService = Get.find<RepairService>();
+  final ImagePicker _imagePicker = ImagePicker();
 
   final formKey = GlobalKey<FormState>();
   final partyNameController = TextEditingController();
@@ -95,13 +97,38 @@ class RepairCreateController extends GetxController {
 
   String get submittingLabel => isEditMode ? 'Updating...' : 'Saving...';
 
-  Future<List<String>> pickAttachments() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
-      type: FileType.image,
+  Future<String?> captureAttachment() async {
+    try {
+      final image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      return image?.path;
+    } catch (error, stackTrace) {
+      _handleAttachmentPickerError(error, stackTrace);
+      return null;
+    }
+  }
+
+  Future<List<String>> pickGalleryAttachments() async {
+    try {
+      final images = await _imagePicker.pickMultiImage(imageQuality: 85);
+      return images.map((image) => image.path).toList();
+    } catch (error, stackTrace) {
+      _handleAttachmentPickerError(error, stackTrace);
+      return <String>[];
+    }
+  }
+
+  void _handleAttachmentPickerError(Object error, StackTrace stackTrace) {
+    debugPrint('Attachment picker error: $error\n$stackTrace');
+    final isChannelError =
+        error is PlatformException && error.code == 'channel-error';
+    ApiResponseHandler.showErrorSnackbar(
+      isChannelError
+          ? 'Attachment picker is not available. Close and reopen the updated app.'
+          : 'Could not open the attachment picker. Please try again.',
     );
-    if (result == null) return <String>[];
-    return result.paths.whereType<String>().toList();
   }
 
   void addItem(RepairDraftItem item) {

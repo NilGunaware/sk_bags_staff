@@ -161,9 +161,7 @@ class LoginView extends GetView<LoginController> {
                 controller: controller.mobileController,
                 keyboardType: TextInputType.phone,
                 maxLength: 10,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   labelText: AppStrings.mobileLabel,
                   prefixIcon: Icon(Icons.phone, color: colorScheme.primary),
@@ -185,22 +183,30 @@ class LoginView extends GetView<LoginController> {
               Obx(() {
                 final items = controller.branches;
                 return DropdownButtonFormField<String>(
-                  value: controller.selectedBranchId.value?.isEmpty == true
+                  initialValue:
+                      controller.selectedBranchId.value?.isEmpty == true
                       ? null
                       : controller.selectedBranchId.value,
                   items: items
-                      .map((b) => DropdownMenuItem<String>(
-                            value: b['id'] as String,
-                            child: Text(b['name'] as String,style: TextStyle(fontSize: 13),),
-                          ))
+                      .map(
+                        (b) => DropdownMenuItem<String>(
+                          value: b['id'] as String,
+                          child: Text(
+                            b['name'] as String,
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: controller.isBranchLoading.value
                       ? null
                       : (val) => controller.selectedBranchId.value = val,
                   decoration: InputDecoration(
                     labelText: 'Branch',
-                    prefixIcon:
-                        Icon(Icons.account_tree_outlined, color: colorScheme.primary),
+                    prefixIcon: Icon(
+                      Icons.account_tree_outlined,
+                      color: colorScheme.primary,
+                    ),
                     filled: true,
                     fillColor: Colors.grey[50],
                   ),
@@ -213,35 +219,39 @@ class LoginView extends GetView<LoginController> {
                 );
               }),
               const SizedBox(height: 16),
-              Obx(() => TextFormField(
-                    controller: controller.passwordController,
-                    obscureText: controller.isPasswordHidden.value,
-                    decoration: InputDecoration(
-                      labelText: AppStrings.passwordLabel,
-                      prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
-                      suffixIcon: IconButton(
-                        onPressed: controller.togglePasswordVisibility,
-                        icon: Icon(
-                          controller.isPasswordHidden.value
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          color: colorScheme.primary,
-                        ),
-                        tooltip: controller.isPasswordHidden.value ? 'Show' : 'Hide',
+              Obx(
+                () => TextFormField(
+                  controller: controller.passwordController,
+                  obscureText: controller.isPasswordHidden.value,
+                  decoration: InputDecoration(
+                    labelText: AppStrings.passwordLabel,
+                    prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
+                    suffixIcon: IconButton(
+                      onPressed: controller.togglePasswordVisibility,
+                      icon: Icon(
+                        controller.isPasswordHidden.value
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: colorScheme.primary,
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
+                      tooltip: controller.isPasswordHidden.value
+                          ? 'Show'
+                          : 'Hide',
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return AppStrings.passwordRequired;
-                      }
-                      if (value.length < 4) {
-                        return AppStrings.passwordTooShort;
-                      }
-                      return null;
-                    },
-                  )),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppStrings.passwordRequired;
+                    }
+                    if (value.length < 4) {
+                      return AppStrings.passwordTooShort;
+                    }
+                    return null;
+                  },
+                ),
+              ),
               // Align(
               //   alignment: Alignment.centerRight,
               //   child: TextButton(

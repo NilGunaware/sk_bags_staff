@@ -1,0 +1,782 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+
+import '../../core/constants/app_colors.dart';
+import '../../data/models/repair_models.dart';
+import 'repair_create_controller.dart';
+
+class RepairCreateView extends GetView<RepairCreateController> {
+  const RepairCreateView({super.key});
+
+  Future<void> _openShopPicker() async {
+    await controller.fetchShops();
+    final searchController = TextEditingController();
+    await Get.bottomSheet<void>(
+      _TextControllerScope(
+        controllers: [searchController],
+        child: SafeArea(
+          child: Container(
+            padding: EdgeInsets.only(
+              left: 18,
+              right: 18,
+              top: 18,
+              bottom: MediaQuery.of(Get.context!).viewInsets.bottom + 18,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: Obx(
+                () => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(child: _SectionTitle('Select Store')),
+                        IconButton.filledTonal(
+                          onPressed: _openAddShopSheet,
+                          icon: const Icon(Icons.add_business_outlined),
+                          tooltip: 'Add store',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: searchController,
+                      decoration: _inputDecoration(
+                        'Search store',
+                        Icons.search_outlined,
+                      ),
+                      onChanged: (value) => controller.fetchShops(query: value),
+                    ),
+                    const SizedBox(height: 12),
+                    if (controller.isShopLoading.value)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: controller.shops.length,
+                          separatorBuilder: (context, index) =>
+                              const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final shop = controller.shops[index];
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.storefront_outlined),
+                              title: Text(shop.name),
+                              subtitle: Text(
+                                [
+                                  if (shop.mobileNo.isNotEmpty) shop.mobileNo,
+                                  if (shop.address.isNotEmpty) shop.address,
+                                ].join(' • '),
+                              ),
+                              trailing: Wrap(
+                                spacing: 4,
+                                children: [
+                                  IconButton(
+                                    onPressed: () => _openAddShopSheet(shop),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    tooltip: 'Update store',
+                                  ),
+                                  if (controller.selectedShop.value?.id ==
+                                      shop.id)
+                                    const Icon(Icons.check_circle),
+                                ],
+                              ),
+                              onTap: () {
+                                controller.selectShop(shop);
+                                Get.back<void>();
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  Future<void> _openAddShopSheet([RepairShopModel? existing]) async {
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final mobileController = TextEditingController(
+      text: existing?.mobileNo ?? '',
+    );
+    final addressController = TextEditingController(
+      text: existing?.address ?? '',
+    );
+    await Get.dialog<void>(
+      _TextControllerScope(
+        controllers: [nameController, mobileController, addressController],
+        child: AlertDialog(
+          title: Text(existing == null ? 'Add Store' : 'Update Store'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: _inputDecoration('Store Name', Icons.store),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: mobileController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: _inputDecoration('Mobile No', Icons.phone),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressController,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: _inputDecoration('Address', Icons.place),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: Get.back, child: const Text('Cancel')),
+            Obx(
+              () => FilledButton.icon(
+                onPressed: controller.isShopLoading.value
+                    ? null
+                    : () async {
+                        await controller.saveShop(
+                          existing: existing,
+                          name: nameController.text,
+                          mobileNo: mobileController.text,
+                          address: addressController.text,
+                        );
+                        if ((controller.selectedShop.value?.name.trim() ??
+                                '') ==
+                            nameController.text.trim()) {
+                          Get.back<void>();
+                        }
+                      },
+                icon: controller.isShopLoading.value
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openItemSheet({int? index}) async {
+    final existing = index == null ? null : controller.items[index];
+    final itemNameController = TextEditingController(
+      text: existing?.itemName.trim().isNotEmpty == true
+          ? existing!.itemName
+          : 'Repair Item',
+    );
+    final qtyController = TextEditingController(
+      text: (existing?.quantity ?? 1).toString(),
+    );
+    final rateController = TextEditingController(
+      text: _amount(existing?.rate ?? 0),
+    );
+    final instructionController = TextEditingController(
+      text: existing?.instruction ?? '',
+    );
+    final existingAttachments =
+        (existing?.existingAttachments.toList() ?? <String>[]).obs;
+    final attachments = (existing?.attachmentPaths.toList() ?? <String>[]).obs;
+
+    await Get.bottomSheet<void>(
+      _TextControllerScope(
+        controllers: [
+          itemNameController,
+          qtyController,
+          rateController,
+          instructionController,
+        ],
+        child: SafeArea(
+          child: Container(
+            padding: EdgeInsets.only(
+              left: 18,
+              right: 18,
+              top: 18,
+              bottom: MediaQuery.of(Get.context!).viewInsets.bottom + 18,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    index == null ? 'Add Repair Item' : 'Edit Repair Item',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: qtyController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: _inputDecoration(
+                            'Qty',
+                            Icons.inventory_2_outlined,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: rateController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,2}'),
+                            ),
+                          ],
+                          decoration: _inputDecoration(
+                            'Rate',
+                            Icons.currency_rupee,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Obx(
+                    () => Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final url in existingAttachments)
+                          InputChip(
+                            avatar: const Icon(Icons.cloud_done, size: 16),
+                            label: Text(
+                              _attachmentLabel(url),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onDeleted: () => existingAttachments.remove(url),
+                          ),
+                        for (final path in attachments)
+                          Chip(
+                            avatar: const Icon(Icons.attach_file, size: 16),
+                            label: Text(
+                              path.split('/').last,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onDeleted: () => attachments.remove(path),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _addAttachments(attachments),
+                    icon: const Icon(Icons.attach_file),
+                    label: const Text('Add Attachment'),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        final name = itemNameController.text.trim();
+                        final qty = int.tryParse(qtyController.text) ?? 0;
+                        final rate = double.tryParse(rateController.text) ?? 0;
+                        if (name.isEmpty || qty <= 0) {
+                          return;
+                        }
+                        final item = RepairDraftItem(
+                          id: existing?.id ?? '',
+                          itemName: name,
+                          quantity: qty,
+                          rate: rate,
+                          instruction: instructionController.text,
+                          attachmentPaths: attachments.toList(),
+                          existingAttachments: existingAttachments.toList(),
+                        );
+                        if (index == null) {
+                          controller.addItem(item);
+                        } else {
+                          controller.updateItem(index, item);
+                        }
+                        Get.back<void>();
+                      },
+                      icon: const Icon(Icons.check),
+                      label: Text(index == null ? 'Add Item' : 'Update Item'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  Future<void> _addAttachments(RxList<String> attachments) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final source = await showModalBottomSheet<_AttachmentSource>(
+      context: Get.context!,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionTitle('Add Attachment'),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Camera'),
+              subtitle: const Text('Take a new photo'),
+              onTap: () => Navigator.pop(context, _AttachmentSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Gallery'),
+              subtitle: const Text('Choose one or more photos'),
+              onTap: () => Navigator.pop(context, _AttachmentSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final paths = switch (source) {
+      _AttachmentSource.camera => [?await controller.captureAttachment()],
+      _AttachmentSource.gallery => await controller.pickGalleryAttachments(),
+    };
+    attachments.addAll(paths.where((path) => !attachments.contains(path)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.scaffold,
+      appBar: AppBar(title: Text(controller.screenTitle)),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Obx(
+            () => ElevatedButton.icon(
+              onPressed: controller.isSubmitting.value
+                  ? null
+                  : controller.submit,
+              icon: controller.isSubmitting.value
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(
+                controller.isSubmitting.value
+                    ? controller.submittingLabel
+                    : controller.submitLabel,
+              ),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(0, 54)),
+            ),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Obx(() {
+          controller.formVersion.value;
+          return Stack(
+            children: [
+              Form(
+                key: controller.formKey,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                  children: [
+                    _Panel(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _Metric(
+                              label: 'Entry No',
+                              value: '#${controller.nextEntryNo.value}',
+                            ),
+                          ),
+                          Expanded(
+                            child: _Metric(
+                              label: 'Entry Date',
+                              value: controller.displayEntryDate,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (controller.isWorkshop) ...[
+                      _Panel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _SectionTitle('Workshop Store'),
+                            const SizedBox(height: 12),
+                            InkWell(
+                              onTap: _openShopPicker,
+                              borderRadius: BorderRadius.circular(18),
+                              child: InputDecorator(
+                                decoration: _inputDecoration(
+                                  'Store',
+                                  Icons.storefront_outlined,
+                                ),
+                                child: Text(
+                                  controller.selectedShop.value?.name ??
+                                      'Select store',
+                                  style: TextStyle(
+                                    color: controller.selectedShop.value == null
+                                        ? Colors.grey.shade700
+                                        : Colors.black,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    _Panel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _SectionTitle('Party Details'),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: controller.partyNameController,
+                            validator: (value) => (value ?? '').trim().isEmpty
+                                ? 'Party name is required'
+                                : null,
+                            decoration: _inputDecoration(
+                              'Party Name',
+                              Icons.person_outline,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: controller.partyMobileController,
+                            keyboardType: TextInputType.phone,
+                            maxLength: 10,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (value) {
+                              final text = (value ?? '').trim();
+                              if (text.length < 10) {
+                                return 'Enter valid mobile no';
+                              }
+                              return null;
+                            },
+                            decoration: _inputDecoration(
+                              'Mobile No',
+                              Icons.phone_outlined,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _Panel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: _SectionTitle('Repair Items'),
+                              ),
+                              IconButton.filledTonal(
+                                onPressed: () => _openItemSheet(),
+                                icon: const Icon(Icons.add),
+                                tooltip: 'Add item',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (controller.items.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24),
+                              child: Center(
+                                child: Text('No repair item added yet.'),
+                              ),
+                            )
+                          else
+                            for (var i = 0; i < controller.items.length; i++)
+                              _DraftRepairTile(
+                                item: controller.items[i],
+                                onEdit: () => _openItemSheet(index: i),
+                                onDelete: () => controller.removeItem(i),
+                              ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _Panel(
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: controller.advanceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d{0,2}'),
+                              ),
+                            ],
+                            decoration: _inputDecoration(
+                              'Advance Amount',
+                              Icons.currency_rupee,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: controller.notesController,
+                            minLines: 2,
+                            maxLines: 4,
+                            decoration: _inputDecoration(
+                              'Notes',
+                              Icons.notes_outlined,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _Metric(
+                                  label: 'Total Qty',
+                                  value: '${controller.totalQuantity}',
+                                ),
+                              ),
+                              Expanded(
+                                child: _Metric(
+                                  label: 'Total',
+                                  value: _amount(controller.totalAmount),
+                                ),
+                              ),
+                              Expanded(
+                                child: _Metric(
+                                  label: 'Balance',
+                                  value: _amount(controller.balanceAmount),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (controller.isPreparing.value)
+                Container(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _TextControllerScope extends StatefulWidget {
+  const _TextControllerScope({required this.controllers, required this.child});
+
+  final List<TextEditingController> controllers;
+  final Widget child;
+
+  @override
+  State<_TextControllerScope> createState() => _TextControllerScopeState();
+}
+
+enum _AttachmentSource { camera, gallery }
+
+class _TextControllerScopeState extends State<_TextControllerScope> {
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+class _DraftRepairTile extends StatelessWidget {
+  const _DraftRepairTile({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final RepairDraftItem item;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F8F8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.itemName,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${item.quantity} x ${_amount(item.rate)} = ${_amount(item.amount)}',
+                ),
+                if (item.attachmentPaths.isNotEmpty)
+                  Text('${item.attachmentPaths.length} attachment(s)'),
+                if (item.existingAttachments.isNotEmpty)
+                  Text(
+                    '${item.existingAttachments.length} saved attachment(s)',
+                  ),
+              ],
+            ),
+          ),
+          IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Panel extends StatelessWidget {
+  const _Panel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey.shade700)),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+        ),
+      ],
+    );
+  }
+}
+
+InputDecoration _inputDecoration(String label, IconData icon) {
+  return InputDecoration(
+    labelText: label,
+    prefixIcon: Icon(icon),
+    filled: true,
+    fillColor: const Color(0xFFF8F8F8),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+  );
+}
+
+String _amount(double value) {
+  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+  return value.toStringAsFixed(2);
+}
+
+String _attachmentLabel(String value) {
+  final uri = Uri.tryParse(value);
+  final segment = uri?.pathSegments.isNotEmpty == true
+      ? uri!.pathSegments.last
+      : value.split('/').last;
+  return segment.trim().isEmpty ? 'Attachment' : segment;
+}

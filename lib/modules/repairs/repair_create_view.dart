@@ -149,12 +149,9 @@ class RepairCreateView extends GetView<RepairCreateController> {
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: () async {
-                      final picked = await controller.pickAttachments();
-                      attachments.addAll(picked);
-                    },
+                    onPressed: () => _addAttachments(attachments),
                     icon: const Icon(Icons.attach_file),
-                    label: const Text('Attach Photos'),
+                    label: const Text('Add Attachment'),
                   ),
                   const SizedBox(height: 18),
                   SizedBox(
@@ -200,6 +197,45 @@ class RepairCreateView extends GetView<RepairCreateController> {
       rateController.dispose();
       instructionController.dispose();
     }
+  }
+
+  Future<void> _addAttachments(RxList<String> attachments) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final source = await showModalBottomSheet<_AttachmentSource>(
+      context: Get.context!,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionTitle('Add Attachment'),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Camera'),
+              subtitle: const Text('Take a new photo'),
+              onTap: () => Navigator.pop(context, _AttachmentSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Gallery'),
+              subtitle: const Text('Choose one or more photos'),
+              onTap: () => Navigator.pop(context, _AttachmentSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final paths = switch (source) {
+      _AttachmentSource.camera => [?await controller.captureAttachment()],
+      _AttachmentSource.gallery => await controller.pickGalleryAttachments(),
+    };
+    attachments.addAll(paths.where((path) => !attachments.contains(path)));
   }
 
   @override
@@ -416,6 +452,8 @@ class RepairCreateView extends GetView<RepairCreateController> {
     );
   }
 }
+
+enum _AttachmentSource { camera, gallery }
 
 class _DraftRepairTile extends StatelessWidget {
   const _DraftRepairTile({

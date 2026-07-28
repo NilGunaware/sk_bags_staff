@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../constants/api_endpoints.dart';
 import '../services/auth_service.dart';
 import '../../modules/auth/controllers/auth_controller.dart';
+import '../../routes/app_routes.dart';
 
 class HttpClient {
   HttpClient._();
@@ -245,9 +246,9 @@ class HttpClient {
       debugPrint('[HttpClient] Received 401 for ${request.url.path}');
       return true;
     }
-    if (response.statusCode == 400 && _isTokenExpired(response.body)) {
+    if (_isTokenExpired(response.body)) {
       debugPrint(
-        '[HttpClient] 400 with token expiration message for ${request.url.path}',
+        '[HttpClient] Token expiration message for ${request.url.path}',
       );
       return true;
     }
@@ -258,6 +259,7 @@ class HttpClient {
     try {
       final lower = responseBody.toLowerCase();
       return lower.contains('token time expire') ||
+          lower.contains('token expire') ||
           lower.contains('token expired') ||
           lower.contains('token is expired') ||
           lower.contains('token has expired') ||
@@ -435,6 +437,9 @@ class HttpClient {
       await Get.find<AuthController>().clearSession();
     } else {
       await _authService?.clearTokens();
+    }
+    if (Get.currentRoute != Routes.login) {
+      Get.offAllNamed(Routes.login);
     }
   }
 

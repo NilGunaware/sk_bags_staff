@@ -9,6 +9,7 @@ import os
 import queue
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -81,6 +82,18 @@ def _quote_env_value(value: str) -> str:
     return value
 
 
+def _safe_urlopen(request_or_url: str | urllib.request.Request, timeout: float):
+    try:
+        ctx = ssl.create_default_context()
+        return urllib.request.urlopen(request_or_url, timeout=timeout, context=ctx)
+    except (ssl.SSLError, urllib.error.URLError, OSError):
+        try:
+            ctx = ssl._create_unverified_context()
+            return urllib.request.urlopen(request_or_url, timeout=timeout, context=ctx)
+        except Exception:
+            return urllib.request.urlopen(request_or_url, timeout=timeout)
+
+
 def refresh_license_status() -> tuple[bool, str]:
     global LICENSE_IS_ACTIVE
     global LICENSE_LAST_RESPONSE
@@ -91,7 +104,7 @@ def refresh_license_status() -> tuple[bool, str]:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=LICENSE_CHECK_TIMEOUT) as response:
+        with _safe_urlopen(request, timeout=LICENSE_CHECK_TIMEOUT) as response:
             raw_value = response.read().decode("utf-8", errors="ignore").strip()
     except (urllib.error.URLError, TimeoutError, OSError) as error:
         LICENSE_IS_ACTIVE = False
@@ -136,7 +149,7 @@ def _sha256_file(path: Path) -> str:
 
 def _request_json(url: str, timeout: float) -> dict[str, object]:
     request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with _safe_urlopen(request, timeout=timeout) as response:
         payload = response.read().decode("utf-8", errors="replace")
     decoded = json.loads(payload)
     if not isinstance(decoded, dict):
@@ -155,7 +168,7 @@ def fetch_public_ip() -> str:
     for url in PUBLIC_IP_CHECK_URLS:
         request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
         try:
-            with urllib.request.urlopen(request, timeout=PUBLIC_IP_CHECK_TIMEOUT) as response:
+            with _safe_urlopen(request, timeout=PUBLIC_IP_CHECK_TIMEOUT) as response:
                 raw_value = response.read().decode("utf-8", errors="ignore")
             return _public_ip_from_text(raw_value)
         except Exception as error:
@@ -168,7 +181,7 @@ def fetch_public_ip() -> str:
 
 def _download_file(url: str, destination: Path, progress_callback: Any | None = None) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": UPDATE_USER_AGENT})
-    with urllib.request.urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT) as response:
+    with _safe_urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT) as response:
         content_length = int(response.headers.get("content-length") or 0)
         downloaded = 0
         with destination.open("wb") as output:
@@ -543,7 +556,7 @@ class ServerManager:
 
     def _health_ok(self) -> bool:
         try:
-            with urllib.request.urlopen(self.health_url, timeout=1.0) as response:
+            with _safe_urlopen(self.health_url, timeout=1.0) as response:
                 return response.status == 200
         except (urllib.error.URLError, TimeoutError, OSError):
             return False
@@ -1695,7 +1708,7 @@ def smoke_test() -> int:
             return 1
 
         print(f"Smoke test passed: {manager.base_url}")
-        with urllib.request.urlopen(manager.health_url, timeout=2.0) as response:
+        with _safe_urlopen(manager.health_url, timeout=2.0) as response:
             print(response.read().decode("utf-8"))
         return 0
     finally:

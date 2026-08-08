@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 
-import '../../../core/constants/api_endpoints.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/storage_service.dart';
 
@@ -22,7 +21,6 @@ class AuthController extends GetxController {
     }
 
     // Restore the persisted session before the first authenticated route opens.
-    ApiEndpoints.activeRole = 'workshop';
     await _authService.saveTokens(token);
     final currentToken = await _authService.getValidAccessToken();
     if (currentToken != null && currentToken != token) {
@@ -35,7 +33,6 @@ class AuthController extends GetxController {
   }
 
   Future<void> saveSession(Map<String, dynamic> userData) async {
-    ApiEndpoints.activeRole = 'workshop';
     await _storageService.saveUser(userData);
     final token = userData['token']?.toString();
     if (token != null && token.isNotEmpty) {

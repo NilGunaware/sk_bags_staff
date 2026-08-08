@@ -9,7 +9,12 @@ class ApiEndpoints {
   static const String login = '/staff/auth/login';
   static const String refreshToken = '/staff/auth/refresh_token';
   static const String apiAccessKey = 'ZkC6BDUzxz';
-  static const String managerBranchRead = '/manager/master/branch/read';
+  static const String staffBranchRead = '/staff/master/branch/read';
+
+  // Karigar Master
+  static const String karigarRead = '/staff/master/karigar/read';
+  static const String karigarStore = '/staff/master/karigar/store/0';
+  static String karigarStoreById(String id) => '/staff/master/karigar/store/$id';
 
   static const String getProfile = '/staff/auth/get_profile';
   static const String scanQrcode = '/staff/stock/scan_qrcode';

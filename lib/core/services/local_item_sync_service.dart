@@ -27,8 +27,9 @@ class LocalItemSyncService extends GetxService {
 
     return <String, bool>{
       for (final outcome in outcomes)
-        outcome.serverName:
-            outcome.response != null && _isHealthyResponse(outcome.response!),
+        outcome.serverName: outcome.isReachable &&
+            (outcome.statusCode == null || (outcome.statusCode! >= 200 && outcome.statusCode! < 400)) &&
+            (outcome.response == null || _isHealthyResponse(outcome.response!)),
     };
   }
 
@@ -432,7 +433,13 @@ class LocalItemSyncService extends GetxService {
     _logApiRequest('GET', uri, body: <String, dynamic>{});
     final http.Response response;
     try {
-      response = await _client.get(uri).timeout(_serverTimeout);
+      response = await _client.get(
+        uri,
+        headers: const <String, String>{
+          'Accept': 'application/json, text/plain, */*',
+          'User-Agent': 'SKBagsStaff/1.0',
+        },
+      ).timeout(_serverTimeout);
     } catch (error) {
       _logApiError('GET', uri, error);
       rethrow;
@@ -699,7 +706,14 @@ class LocalItemSyncService extends GetxService {
     if (status == null || status.isEmpty) {
       return true;
     }
-    return status == 'ok' || status == 'true' || status == 'online';
+    return status == 'ok' ||
+        status == 'true' ||
+        status == 'online' ||
+        status == 'live' ||
+        status == 'healthy' ||
+        status == 'active' ||
+        status == 'success' ||
+        status == '1';
   }
 
   String _buildServerItemKey(Map<String, dynamic> item) {

@@ -7,6 +7,7 @@ import '../modules/orders/orders_binding.dart';
 import '../modules/repairs/repair_create_view.dart';
 import '../modules/repairs/repair_detail_view.dart';
 import '../modules/repairs/repair_list_view.dart';
+import '../modules/repairs/karigar_list_view.dart';
 import '../modules/repairs/repairs_binding.dart';
 import '../modules/scanner/scanner_binding.dart';
 import '../modules/scanner/scanner_view.dart';
@@ -69,6 +70,11 @@ class AppPages {
       name: Routes.repairDetail,
       page: () => const RepairDetailView(),
       binding: RepairDetailBinding(),
+    ),
+    GetPage(
+      name: Routes.karigars,
+      page: () => const KarigarListView(),
+      binding: KarigarListBinding(),
     ),
   ];
 }

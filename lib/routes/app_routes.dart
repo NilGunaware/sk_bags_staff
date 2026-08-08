@@ -9,4 +9,5 @@ abstract class Routes {
   static const String repairs = '/repairs';
   static const String repairCreate = '/repairs/create';
   static const String repairDetail = '/repairs/detail';
+  static const String karigars = '/repairs/karigars';
 }

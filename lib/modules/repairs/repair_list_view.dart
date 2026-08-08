@@ -41,6 +41,11 @@ class RepairListView extends GetView<RepairListController> {
       appBar: AppBar(
         title: const Text('Repairs'),
         actions: [
+          IconButton(
+            onPressed: () => Get.toNamed(Routes.karigars),
+            icon: const Icon(Icons.people_outline),
+            tooltip: 'Manage Karigars',
+          ),
           Obx(
             () => IconButton(
               onPressed: controller.toggleFilters,

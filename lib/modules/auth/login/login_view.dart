@@ -141,159 +141,162 @@ class LoginView extends GetView<LoginController> {
         padding: const EdgeInsets.all(24),
         child: Form(
           key: controller.formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                AppStrings.loginButton,
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: colorScheme.primary,
+          child: AutofillGroup(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  AppStrings.loginButton,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.primary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                AppStrings.signInSubtitle,
-                style: textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: controller.mobileController,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: AppStrings.mobileLabel,
-                  prefixIcon: Icon(Icons.phone, color: colorScheme.primary),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  counterText: "",
+                const SizedBox(height: 4),
+                Text(
+                  AppStrings.signInSubtitle,
+                  style: textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return AppStrings.mobileRequired;
-                  }
-                  if (value.trim().length != 10) {
-                    return 'Mobile number must be 10 digits';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              Obx(() {
-                final items = controller.branches;
-                return DropdownButtonFormField<String>(
-                  initialValue:
-                      controller.selectedBranchId.value?.isEmpty == true
-                      ? null
-                      : controller.selectedBranchId.value,
-                  items: items
-                      .map(
-                        (b) => DropdownMenuItem<String>(
-                          value: b['id'] as String,
-                          child: Text(
-                            b['name'] as String,
-                            style: TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: controller.isBranchLoading.value
-                      ? null
-                      : (val) => controller.selectedBranchId.value = val,
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: controller.mobileController,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  autofillHints: const [AutofillHints.telephoneNumber],
                   decoration: InputDecoration(
-                    labelText: 'Branch',
-                    prefixIcon: Icon(
-                      Icons.account_tree_outlined,
-                      color: colorScheme.primary,
-                    ),
+                    labelText: AppStrings.mobileLabel,
+                    prefixIcon: Icon(Icons.phone, color: colorScheme.primary),
                     filled: true,
                     fillColor: Colors.grey[50],
+                    counterText: "",
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a branch';
+                    if (value == null || value.trim().isEmpty) {
+                      return AppStrings.mobileRequired;
                     }
-                    return null;
-                  },
-                );
-              }),
-              const SizedBox(height: 16),
-              Obx(
-                () => TextFormField(
-                  controller: controller.passwordController,
-                  obscureText: controller.isPasswordHidden.value,
-                  decoration: InputDecoration(
-                    labelText: AppStrings.passwordLabel,
-                    prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
-                    suffixIcon: IconButton(
-                      onPressed: controller.togglePasswordVisibility,
-                      icon: Icon(
-                        controller.isPasswordHidden.value
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: colorScheme.primary,
-                      ),
-                      tooltip: controller.isPasswordHidden.value
-                          ? 'Show'
-                          : 'Hide',
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return AppStrings.passwordRequired;
-                    }
-                    if (value.length < 4) {
-                      return AppStrings.passwordTooShort;
+                    if (value.trim().length != 10) {
+                      return 'Mobile number must be 10 digits';
                     }
                     return null;
                   },
                 ),
-              ),
-              // Align(
-              //   alignment: Alignment.centerRight,
-              //   child: TextButton(
-              //     onPressed: () {},
-              //     child: const Text(
-              //       'Forgot Password?',
-              //       style: TextStyle(
-              //         color: AppColors.primary,
-              //       ),
-              //     ),
-              //   ),
-              // ),
-              const SizedBox(height: 20),
-              Obx(
-                () => FilledButton(
-                  onPressed: controller.isLoading.value
-                      ? null
-                      : () {
-                          FocusScope.of(context).unfocus();
-                          controller.submit();
-                        },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: controller.isLoading.value
-                      ? SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              colorScheme.onPrimary,
+                const SizedBox(height: 16),
+                Obx(() {
+                  final items = controller.branches;
+                  return DropdownButtonFormField<String>(
+                    initialValue:
+                        controller.selectedBranchId.value?.isEmpty == true
+                        ? null
+                        : controller.selectedBranchId.value,
+                    items: items
+                        .map(
+                          (b) => DropdownMenuItem<String>(
+                            value: b['id'] as String,
+                            child: Text(
+                              b['name'] as String,
+                              style: TextStyle(fontSize: 13),
                             ),
                           ),
                         )
-                      : const Text(AppStrings.loginButton),
+                        .toList(),
+                    onChanged: controller.isBranchLoading.value
+                        ? null
+                        : (val) => controller.selectedBranchId.value = val,
+                    decoration: InputDecoration(
+                      labelText: 'Branch',
+                      prefixIcon: Icon(
+                        Icons.account_tree_outlined,
+                        color: colorScheme.primary,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a branch';
+                      }
+                      return null;
+                    },
+                  );
+                }),
+                const SizedBox(height: 16),
+                Obx(
+                  () => TextFormField(
+                    controller: controller.passwordController,
+                    obscureText: controller.isPasswordHidden.value,
+                    autofillHints: const [AutofillHints.password],
+                    decoration: InputDecoration(
+                      labelText: AppStrings.passwordLabel,
+                      prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
+                      suffixIcon: IconButton(
+                        onPressed: controller.togglePasswordVisibility,
+                        icon: Icon(
+                          controller.isPasswordHidden.value
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: colorScheme.primary,
+                        ),
+                        tooltip: controller.isPasswordHidden.value
+                            ? 'Show'
+                            : 'Hide',
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return AppStrings.passwordRequired;
+                      }
+                      if (value.length < 4) {
+                        return AppStrings.passwordTooShort;
+                      }
+                      return null;
+                    },
+                  ),
                 ),
-              ),
-            ],
+                // Align(
+                //   alignment: Alignment.centerRight,
+                //   child: TextButton(
+                //     onPressed: () {},
+                //     child: const Text(
+                //       'Forgot Password?',
+                //       style: TextStyle(
+                //         color: AppColors.primary,
+                //       ),
+                //     ),
+                //   ),
+                // ),
+                const SizedBox(height: 20),
+                Obx(
+                  () => FilledButton(
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : () {
+                            FocusScope.of(context).unfocus();
+                            TextInput.finishAutofillContext();
+                            controller.submit();
+                          },
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: controller.isLoading.value
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(AppStrings.loginButton),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -4,9 +4,47 @@ import 'package:get/get.dart';
 import '../../core/services/repair_service.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/repair_models.dart';
+import '../../routes/app_routes.dart';
+import '../auth/controllers/auth_controller.dart';
 
 class RepairListController extends GetxController {
   final RepairService _repairService = Get.find<RepairService>();
+  final AuthController _authController = Get.find<AuthController>();
+
+  String get userName {
+    final userData = _authController.user.value;
+    if (userData == null) return 'N/A';
+    final userMap = userData['user'];
+    if (userMap is Map) {
+      return (userMap['name'] ?? '').toString();
+    }
+    return (userData['name'] ?? '').toString();
+  }
+
+  String get userMobile {
+    final userData = _authController.user.value;
+    if (userData == null) return '';
+    final userMap = userData['user'];
+    if (userMap is Map) {
+      return (userMap['mobile_no'] ?? '').toString();
+    }
+    return (userData['mobile_no'] ?? '').toString();
+  }
+
+  String get shopName {
+    final userData = _authController.user.value;
+    if (userData == null) return 'N/A';
+    final userMap = userData['user'];
+    if (userMap is Map) {
+      return (userMap['shop_name'] ?? userData['shop_name'] ?? '').toString();
+    }
+    return (userData['shop_name'] ?? '').toString();
+  }
+
+  Future<void> logout() async {
+    await _authController.clearSession();
+    Get.offAllNamed(Routes.login);
+  }
 
   final entryNoController = TextEditingController();
   final partyNameController = TextEditingController();

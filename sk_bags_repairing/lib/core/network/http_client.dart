@@ -31,12 +31,9 @@ class HttpClient {
     _instance = null;
   }
 
-  Future<http.Response> get(
-    String endpoint, {
-    Map<String, String>? headers,
-    Map<String, dynamic>? queryParams,
-  }) async {
-    var uri = Uri.parse('${ApiEndpoints.baseUrl}$endpoint');
+  Uri _getUri(String endpoint, Map<String, dynamic>? queryParams) {
+    final path = endpoint.startsWith('/') ? endpoint : '/$endpoint';
+    var uri = Uri.parse('${ApiEndpoints.baseUrl}$path');
     if (queryParams != null && queryParams.isNotEmpty) {
       uri = uri.replace(
         queryParameters: queryParams.map(
@@ -44,9 +41,17 @@ class HttpClient {
         ),
       );
     }
+    return uri;
+  }
 
+  Future<http.Response> get(
+    String endpoint, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? queryParams,
+  }) async {
+    final uri = _getUri(endpoint, queryParams);
     final request = http.Request('GET', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     return _sendWithRefresh(request);
   }
 
@@ -56,16 +61,9 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Object? body,
   }) async {
-    var uri = Uri.parse('${ApiEndpoints.baseUrl}$endpoint');
-    if (queryParams != null && queryParams.isNotEmpty) {
-      uri = uri.replace(
-        queryParameters: queryParams.map(
-          (key, value) => MapEntry(key, value?.toString() ?? ''),
-        ),
-      );
-    }
+    final uri = _getUri(endpoint, queryParams);
     final request = http.Request('POST', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     _attachBody(request, body);
     return _sendWithRefresh(request);
   }
@@ -76,16 +74,9 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Object? body,
   }) async {
-    var uri = Uri.parse('${ApiEndpoints.baseUrl}$endpoint');
-    if (queryParams != null && queryParams.isNotEmpty) {
-      uri = uri.replace(
-        queryParameters: queryParams.map(
-          (key, value) => MapEntry(key, value?.toString() ?? ''),
-        ),
-      );
-    }
+    final uri = _getUri(endpoint, queryParams);
     final request = http.Request('PUT', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     _attachBody(request, body);
     return _sendWithRefresh(request);
   }
@@ -96,16 +87,9 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Object? body,
   }) async {
-    var uri = Uri.parse('${ApiEndpoints.baseUrl}$endpoint');
-    if (queryParams != null && queryParams.isNotEmpty) {
-      uri = uri.replace(
-        queryParameters: queryParams.map(
-          (key, value) => MapEntry(key, value?.toString() ?? ''),
-        ),
-      );
-    }
+    final uri = _getUri(endpoint, queryParams);
     final request = http.Request('DELETE', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     _attachBody(request, body);
     return _sendWithRefresh(request);
   }
@@ -118,18 +102,11 @@ class HttpClient {
     Map<String, String>? filePaths,
     List<MapEntry<String, String>>? filePathEntries,
   }) async {
-    var uri = Uri.parse('${ApiEndpoints.baseUrl}$endpoint');
-    if (queryParams != null && queryParams.isNotEmpty) {
-      uri = uri.replace(
-        queryParameters: queryParams.map(
-          (key, value) => MapEntry(key, value?.toString() ?? ''),
-        ),
-      );
-    }
+    final uri = _getUri(endpoint, queryParams);
 
     Future<http.Response> sendMultipart(String? overrideToken) async {
       final request = http.MultipartRequest('POST', uri);
-      final hdrs = await _getHeaders(additionalHeaders: headers);
+      final hdrs = await _getHeaders(endpoint, additionalHeaders: headers);
       hdrs.remove('Content-Type');
       if (overrideToken != null && overrideToken.isNotEmpty) {
         hdrs['Auth'] = 'Bearer $overrideToken';
@@ -239,7 +216,8 @@ class HttpClient {
   }
 
   bool _shouldRefresh(http.Response response, http.Request request) {
-    if (request.url.path.contains(ApiEndpoints.refreshToken)) {
+    if (request.url.path.contains(ApiEndpoints.refreshToken) ||
+        request.url.path.contains('/auth/login')) {
       return false;
     }
     if (response.statusCode == 401) {
@@ -271,7 +249,8 @@ class HttpClient {
     }
   }
 
-  Future<Map<String, String>> _getHeaders({
+  Future<Map<String, String>> _getHeaders(
+    String endpoint, {
     Map<String, String>? additionalHeaders,
   }) async {
     final headers = <String, String>{
@@ -280,9 +259,11 @@ class HttpClient {
       'Api-Access-Key': ApiEndpoints.apiAccessKey,
     };
 
-    final token = await _authService?.getValidAccessToken();
-    if (token != null && token.isNotEmpty) {
-      headers['Auth'] = 'Bearer $token';
+    if (!endpoint.contains('/auth/login')) {
+      final token = await _authService?.getValidAccessToken();
+      if (token != null && token.isNotEmpty) {
+        headers['Auth'] = 'Bearer $token';
+      }
     }
 
     if (additionalHeaders != null) {

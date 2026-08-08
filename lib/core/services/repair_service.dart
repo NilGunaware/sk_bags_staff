@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/repair_models.dart';
+import '../../data/models/karigar_model.dart';
+import '../../data/models/branch_model.dart';
 import '../../data/providers/api_provider.dart';
 import '../constants/api_endpoints.dart';
 
@@ -95,6 +97,80 @@ class RepairService extends GetxService {
         : <RepairItemModel>[];
 
     return RepairDetailModel(summary: summary, items: items, raw: data);
+  }
+
+  Future<List<BranchModel>> fetchBranches({
+    String id = '',
+    String name = '',
+  }) async {
+    final response = await _apiProvider.post(
+      ApiEndpoints.staffBranchRead,
+      data: <String, dynamic>{
+        'offset': 0,
+        'search': <String, dynamic>{'id': id, 'name': name},
+      },
+    );
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not load branches.',
+    );
+    final data = _dataMap(response);
+    return _recordList(data, fallback: response)
+        .map(BranchModel.fromJson)
+        .toList();
+  }
+
+  Future<List<KarigarModel>> fetchKarigars({
+    String id = '',
+    String name = '',
+  }) async {
+    final response = await _apiProvider.post(
+      ApiEndpoints.karigarRead,
+      data: <String, dynamic>{
+        'offset': 0,
+        'search': <String, dynamic>{'id': id, 'name': name},
+      },
+    );
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not load karigars.',
+    );
+    final data = _dataMap(response);
+    return _recordList(data, fallback: response)
+        .map(KarigarModel.fromJson)
+        .toList();
+  }
+
+  Future<KarigarModel> saveKarigar({
+    String id = '0',
+    required String name,
+    required String mobileNo,
+    required String password,
+    required String address,
+    required String shopName,
+  }) async {
+    final response = await _apiProvider.post(
+      id.trim().isEmpty || id.trim() == '0'
+          ? ApiEndpoints.karigarStore
+          : ApiEndpoints.karigarStoreById(id.trim()),
+      data: <String, dynamic>{
+        'name': name.trim(),
+        'mobile_no': mobileNo.trim(),
+        'password': password.trim(),
+        'address': address.trim(),
+        'shop_name': shopName.trim(),
+      },
+    );
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not save karigar.',
+    );
+    final data = _dataMap(response);
+    final records = _recordList(data, fallback: response);
+    if (records.isNotEmpty) {
+      return KarigarModel.fromJson(records.first);
+    }
+    return KarigarModel.fromJson(data);
   }
 
   Future<Map<String, dynamic>> createRepair({

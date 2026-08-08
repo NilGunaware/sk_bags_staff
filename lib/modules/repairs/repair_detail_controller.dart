@@ -20,6 +20,29 @@ class RepairDetailController extends GetxController {
     if (argument is RepairSummaryModel) {
       repair.value = argument;
       fetchDetail();
+    } else if (argument is RepairDetailModel) {
+      detail.value = argument;
+      repair.value = argument.summary;
+      fetchDetail();
+    } else if (argument != null) {
+      final id = argument.toString().trim();
+      if (id.isNotEmpty) {
+        repair.value = RepairSummaryModel(
+          id: id,
+          uuid: '',
+          entryNo: id,
+          entryDate: '',
+          partyName: '',
+          partyMobile: '',
+          totalQty: 0,
+          totalAmount: 0,
+          advanceAmount: 0,
+          deliveryDate: '',
+          notes: '',
+          raw: const <String, dynamic>{},
+        );
+        fetchDetail();
+      }
     }
   }
 

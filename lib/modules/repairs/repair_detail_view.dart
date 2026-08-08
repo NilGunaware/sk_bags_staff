@@ -16,22 +16,17 @@ class RepairDetailView extends GetView<RepairDetailController> {
     if (detail == null || controller.isLoading.value) return;
 
     final result = await Get.toNamed(Routes.repairCreate, arguments: detail);
-    final updated =
-        result == true || (result is Map && result['updated'] == true);
+    final updated = result == true || (result is Map && result['updated'] == true);
     if (!updated) return;
 
     controller.wasUpdated = true;
     await controller.fetchDetail();
-    final message = result is Map
-        ? (result['message'] ?? 'Repair updated successfully').toString()
-        : 'Repair updated successfully';
+    final message = result is Map ? (result['message'] ?? 'Repair updated successfully').toString() : 'Repair updated successfully';
     ApiResponseHandler.showSuccessSnackbar(message);
   }
 
   void _goBack(BuildContext context) {
-    Navigator.of(context).pop<Map<String, dynamic>?>(
-      controller.wasUpdated ? <String, dynamic>{'updated': true} : null,
-    );
+    Navigator.of(context).pop<Map<String, dynamic>?>(controller.wasUpdated ? <String, dynamic>{'updated': true} : null);
   }
 
   @override
@@ -44,26 +39,18 @@ class RepairDetailView extends GetView<RepairDetailController> {
       child: Scaffold(
         backgroundColor: AppColors.scaffold,
         appBar: AppBar(
-          leading: IconButton(
-            onPressed: () => _goBack(context),
-            icon: const Icon(Icons.arrow_back),
-          ),
+          leading: IconButton(onPressed: () => _goBack(context), icon: const Icon(Icons.arrow_back)),
           title: const Text('Repair Detail'),
           actions: [
             Obx(() {
               final detail = controller.detail.value;
-              return IconButton(
-                onPressed: detail == null ? null : _openUpdateRepair,
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Edit repair',
-              );
+              return IconButton(onPressed: detail == null ? null : _openUpdateRepair, icon: const Icon(Icons.edit_outlined), tooltip: 'Edit repair');
             }),
           ],
         ),
         body: SafeArea(
           child: Obx(() {
-            final summary =
-                controller.detail.value?.summary ?? controller.repair.value;
+            final summary = controller.detail.value?.summary ?? controller.repair.value;
             final detail = controller.detail.value;
 
             if (controller.isLoading.value && detail == null) {
@@ -80,31 +67,25 @@ class RepairDetailView extends GetView<RepairDetailController> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                 children: [
-                  if (controller.errorMessage.value != null) ...[
-                    _Message(message: controller.errorMessage.value!),
-                    const SizedBox(height: 14),
-                  ],
+                  if (controller.errorMessage.value != null) ...[_Message(message: controller.errorMessage.value!), const SizedBox(height: 14)],
                   _Panel(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Repair #${summary.entryNo.isEmpty ? '-' : summary.entryNo}',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
+                        Text('Repair #${summary.entryNo.isEmpty ? summary.id : summary.entryNo}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                        if (summary.uuid.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'UUID: ${summary.uuid}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
                           ),
-                        ),
+                        ],
                         const SizedBox(height: 12),
                         _InfoRow(label: 'Party', value: summary.partyName),
                         _InfoRow(label: 'Mobile', value: summary.partyMobile),
                         _InfoRow(label: 'Entry Date', value: summary.entryDate),
-                        _InfoRow(
-                          label: 'Delivery',
-                          value: summary.deliveryDate,
-                        ),
-                        if (summary.notes.isNotEmpty)
-                          _InfoRow(label: 'Notes', value: summary.notes),
+                        _InfoRow(label: 'Delivery', value: summary.deliveryDate),
+                        if (summary.notes.isNotEmpty) _InfoRow(label: 'Notes', value: summary.notes),
                       ],
                     ),
                   ),
@@ -113,22 +94,10 @@ class RepairDetailView extends GetView<RepairDetailController> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: _Metric(
-                            label: 'Qty',
-                            value: '${summary.totalQty}',
-                          ),
+                          child: _Metric(label: 'QTY', value: '${summary.totalQty}'),
                         ),
                         Expanded(
-                          child: _Metric(
-                            label: 'Total',
-                            value: _amount(summary.totalAmount),
-                          ),
-                        ),
-                        Expanded(
-                          child: _Metric(
-                            label: 'Balance',
-                            value: _amount(summary.balanceAmount),
-                          ),
+                          child: _Metric(label: 'Total Amount', value: _amount(summary.totalAmount)),
                         ),
                       ],
                     ),
@@ -138,24 +107,15 @@ class RepairDetailView extends GetView<RepairDetailController> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Items',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                        Text('Items (${detail?.items.length ?? 0})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                         const SizedBox(height: 12),
                         if (detail == null || detail.items.isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 18),
-                            child: Center(
-                              child: Text('No repair items found.'),
-                            ),
+                            child: Center(child: Text('No repair items found.')),
                           )
                         else
-                          for (final item in detail.items)
-                            _RepairItemCard(item: item),
+                          for (final item in detail.items) _RepairItemCard(item: item),
                       ],
                     ),
                   ),
@@ -187,22 +147,44 @@ class _RepairItemCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            item.itemName,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+          Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Qty', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    const SizedBox(height: 2),
+                    Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Rate', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    const SizedBox(height: 2),
+                    Text(_amount(item.rate), style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total Amt', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    const SizedBox(height: 2),
+                    Text(_amount(item.amount), style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${item.quantity} x ${_amount(item.rate)} = ${_amount(item.amount)}',
-          ),
-          if (item.instruction.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(item.instruction),
-          ],
-          if (item.attachments.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _AttachmentGrid(attachments: item.attachments),
-          ],
+          if (item.instruction.isNotEmpty) ...[const SizedBox(height: 8), Text('Instruction: ${item.instruction}', style: TextStyle(color: Colors.grey.shade800, fontSize: 13))],
+          if (item.attachments.isNotEmpty) ...[const SizedBox(height: 10), _AttachmentGrid(attachments: item.attachments)],
         ],
       ),
     );
@@ -214,6 +196,39 @@ class _AttachmentGrid extends StatelessWidget {
 
   final List<String> attachments;
 
+  void _showImagePreview(BuildContext context, String imageUrl) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black87,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: FallbackNetworkImage(imageUrls: [imageUrl], fit: BoxFit.contain, iconColor: Colors.white70),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Wrap(
@@ -221,35 +236,31 @@ class _AttachmentGrid extends StatelessWidget {
       runSpacing: 10,
       children: [
         for (final attachment in attachments)
-          SizedBox(
-            width: 96,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: 96,
-                    height: 82,
-                    color: Colors.white,
-                    child: FallbackNetworkImage(
-                      imageUrls: [attachment],
-                      iconColor: AppColors.primary,
-                      iconSize: 28,
+          GestureDetector(
+            onTap: () => _showImagePreview(context, attachment),
+            child: SizedBox(
+              width: 96,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 96,
+                      height: 82,
+                      color: Colors.white,
+                      child: FallbackNetworkImage(imageUrls: [attachment], iconColor: AppColors.primary, iconSize: 28),
                     ),
                   ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  _attachmentLabel(attachment),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                  const SizedBox(height: 5),
+                  Text(
+                    _attachmentLabel(attachment),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
       ],
@@ -294,10 +305,7 @@ class _InfoRow extends StatelessWidget {
             child: Text(label, style: TextStyle(color: Colors.grey.shade700)),
           ),
           Expanded(
-            child: Text(
-              value.trim().isEmpty ? '-' : value,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
+            child: Text(value.trim().isEmpty ? '-' : value, style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -318,10 +326,7 @@ class _Metric extends StatelessWidget {
       children: [
         Text(label, style: TextStyle(color: Colors.grey.shade700)),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-        ),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
       ],
     );
   }
@@ -353,8 +358,6 @@ String _amount(double value) {
 
 String _attachmentLabel(String value) {
   final uri = Uri.tryParse(value);
-  final segment = uri?.pathSegments.isNotEmpty == true
-      ? uri!.pathSegments.last
-      : value.split('/').last;
+  final segment = uri?.pathSegments.isNotEmpty == true ? uri!.pathSegments.last : value.split('/').last;
   return segment.trim().isEmpty ? 'Attachment' : segment;
 }

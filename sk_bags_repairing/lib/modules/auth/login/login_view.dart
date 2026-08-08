@@ -100,105 +100,82 @@ class LoginView extends GetView<LoginController> {
         padding: const EdgeInsets.all(24),
         child: Form(
           key: controller.formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                AppStrings.loginButton,
-                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: colorScheme.primary),
-              ),
-              const SizedBox(height: 24),
-
-              // Mobile Number Field
-              TextFormField(
-                controller: controller.mobileController,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: AppStrings.mobileLabel,
-                  prefixIcon: Icon(Icons.phone, color: colorScheme.primary),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  counterText: "",
+          child: AutofillGroup(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  AppStrings.loginButton,
+                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: colorScheme.primary),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) return AppStrings.mobileRequired;
-                  if (value.trim().length != 10) return 'Mobile number must be 10 digits';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-              // Mandatory Branch Dropdown
-              Obx(
-                () => DropdownButtonFormField<String>(
-                  initialValue: controller.selectedBranchId.value,
-                  items: controller.branches
-                      .map(
-                        (b) => DropdownMenuItem<String>(
-                          value: b['id'] as String,
-                          child: Text(b['name'] as String, style: const TextStyle(fontSize: 14)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: controller.isBranchLoading.value ? null : (val) => controller.selectedBranchId.value = val,
+                // Mobile Number Field
+                TextFormField(
+                  controller: controller.mobileController,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  autofillHints: const [AutofillHints.telephoneNumber],
                   decoration: InputDecoration(
-                    labelText: controller.isBranchLoading.value ? 'Loading Branches...' : 'Select Branch',
-                    prefixIcon: Icon(Icons.location_on_outlined, color: colorScheme.primary),
+                    labelText: AppStrings.mobileLabel,
+                    prefixIcon: Icon(Icons.phone, color: colorScheme.primary),
                     filled: true,
                     fillColor: Colors.grey[50],
-                    suffixIcon: controller.isBranchLoading.value ? const Padding(padding: EdgeInsets.all(12.0), child: CircularProgressIndicator(strokeWidth: 2)) : null,
+                    counterText: "",
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please select a branch';
+                    if (value == null || value.trim().isEmpty) return AppStrings.mobileRequired;
+                    if (value.trim().length != 10) return 'Mobile number must be 10 digits';
                     return null;
                   },
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Password Field
-              Obx(
-                () => TextFormField(
-                  controller: controller.passwordController,
-                  obscureText: controller.isPasswordHidden.value,
-                  decoration: InputDecoration(
-                    labelText: AppStrings.passwordLabel,
-                    prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
-                    suffixIcon: IconButton(
-                      onPressed: controller.togglePasswordVisibility,
-                      icon: Icon(controller.isPasswordHidden.value ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: colorScheme.primary),
+                // Password Field
+                Obx(
+                  () => TextFormField(
+                    controller: controller.passwordController,
+                    obscureText: controller.isPasswordHidden.value,
+                    autofillHints: const [AutofillHints.password],
+                    decoration: InputDecoration(
+                      labelText: AppStrings.passwordLabel,
+                      prefixIcon: Icon(Icons.lock, color: colorScheme.primary),
+                      suffixIcon: IconButton(
+                        onPressed: controller.togglePasswordVisibility,
+                        icon: Icon(controller.isPasswordHidden.value ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: colorScheme.primary),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
                     ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return AppStrings.passwordRequired;
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return AppStrings.passwordRequired;
-                    return null;
-                  },
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Login Button
-              Obx(
-                () => FilledButton(
-                  onPressed: controller.isLoading.value
-                      ? null
-                      : () {
-                          FocusScope.of(context).unfocus();
-                          controller.submit();
-                        },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                // Login Button
+                Obx(
+                  () => FilledButton(
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : () {
+                            FocusScope.of(context).unfocus();
+                            TextInput.finishAutofillContext();
+                            controller.submit();
+                          },
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: controller.isLoading.value ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text(AppStrings.loginButton),
                   ),
-                  child: controller.isLoading.value ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text(AppStrings.loginButton),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

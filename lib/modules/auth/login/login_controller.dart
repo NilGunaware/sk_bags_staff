@@ -76,7 +76,7 @@ class LoginController extends GetxController {
           'name': '',
         }
       };
-      final response = await _apiProvider.post(ApiEndpoints.managerBranchRead, data: payload);
+      final response = await _apiProvider.post(ApiEndpoints.staffBranchRead, data: payload);
       final ok = ApiResponseHandler.handleResponse(response, showSuccessMessage: false);
       if (!ok) return;
       final data = response['data'] as Map<String, dynamic>?;

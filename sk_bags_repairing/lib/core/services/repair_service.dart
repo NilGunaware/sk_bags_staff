@@ -97,54 +97,7 @@ class RepairService extends GetxService {
     return RepairDetailModel(summary: summary, items: items, raw: data);
   }
 
-  Future<List<RepairShopModel>> fetchShops({
-    String id = '',
-    String name = '',
-  }) async {
-    final response = await _apiProvider.post(
-      ApiEndpoints.shopRead,
-      data: <String, dynamic>{
-        'offset': 0,
-        'search': <String, dynamic>{'id': id, 'name': name},
-      },
-    );
-    _ensureRepairResponseOk(
-      response,
-      fallbackMessage: 'Could not load stores.',
-    );
-    final data = _dataMap(response);
-    return _recordList(data, fallback: response)
-        .map(RepairShopModel.fromJson)
-        .toList();
-  }
 
-  Future<RepairShopModel> saveShop({
-    String id = '0',
-    required String name,
-    required String mobileNo,
-    required String address,
-  }) async {
-    final response = await _apiProvider.post(
-      id.trim().isEmpty || id.trim() == '0'
-          ? ApiEndpoints.shopStore
-          : ApiEndpoints.shopStoreById(id.trim()),
-      data: <String, dynamic>{
-        'name': name.trim(),
-        'mobile_no': mobileNo.trim(),
-        'address': address.trim(),
-      },
-    );
-    _ensureRepairResponseOk(
-      response,
-      fallbackMessage: 'Could not save store.',
-    );
-    final data = _dataMap(response);
-    final records = _recordList(data, fallback: response);
-    if (records.isNotEmpty) {
-      return RepairShopModel.fromJson(records.first);
-    }
-    return RepairShopModel.fromJson(data);
-  }
 
   Future<Map<String, dynamic>> createRepair({
     required String uuid,
@@ -230,9 +183,7 @@ class RepairService extends GetxService {
       'notes': notes.trim(),
       'items': jsonEncode(items.map((item) => item.toApiJson()).toList()),
     };
-    if (ApiEndpoints.isWorkshop) {
-      fields['shop_id'] = shopId.trim();
-    }
+    fields['shop_id'] = shopId.trim();
 
     final fileEntries = <MapEntry<String, String>>[];
     for (var index = 0; index < items.length; index++) {

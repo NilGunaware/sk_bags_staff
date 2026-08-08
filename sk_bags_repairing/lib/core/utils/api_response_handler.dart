@@ -29,9 +29,22 @@ class ApiResponseHandler {
     try {
       final Map<String, dynamic> responseData = _asMap(response);
       final bool status = responseData['status'] == true;
-      final String message = responseData['message']?.toString().trim() ?? '';
+      String message = responseData['message']?.toString().trim() ?? '';
 
       if (!status) {
+        if (message.isEmpty || message.toLowerCase() == 'login failed.') {
+          final err = responseData['error'];
+          if (err is List && err.isNotEmpty) {
+            message = err.first.toString();
+          } else if (err is String && err.trim().isNotEmpty) {
+            message = err;
+          } else {
+            final msgVal = responseData['msg']?.toString().trim() ?? '';
+            if (msgVal.isNotEmpty) {
+              message = msgVal;
+            }
+          }
+        }
         if (showErrorMessage && message.isNotEmpty) {
           _showMessage(message, isSuccess: false);
         }

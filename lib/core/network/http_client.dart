@@ -46,7 +46,7 @@ class HttpClient {
     }
 
     final request = http.Request('GET', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     return _sendWithRefresh(request);
   }
 
@@ -65,7 +65,7 @@ class HttpClient {
       );
     }
     final request = http.Request('POST', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     _attachBody(request, body);
     return _sendWithRefresh(request);
   }
@@ -85,7 +85,7 @@ class HttpClient {
       );
     }
     final request = http.Request('PUT', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     _attachBody(request, body);
     return _sendWithRefresh(request);
   }
@@ -105,7 +105,7 @@ class HttpClient {
       );
     }
     final request = http.Request('DELETE', uri);
-    request.headers.addAll(await _getHeaders(additionalHeaders: headers));
+    request.headers.addAll(await _getHeaders(endpoint, additionalHeaders: headers));
     _attachBody(request, body);
     return _sendWithRefresh(request);
   }
@@ -129,7 +129,7 @@ class HttpClient {
 
     Future<http.Response> sendMultipart(String? overrideToken) async {
       final request = http.MultipartRequest('POST', uri);
-      final hdrs = await _getHeaders(additionalHeaders: headers);
+      final hdrs = await _getHeaders(endpoint, additionalHeaders: headers);
       hdrs.remove('Content-Type');
       if (overrideToken != null && overrideToken.isNotEmpty) {
         hdrs['Auth'] = 'Bearer $overrideToken';
@@ -271,7 +271,8 @@ class HttpClient {
     }
   }
 
-  Future<Map<String, String>> _getHeaders({
+  Future<Map<String, String>> _getHeaders(
+    String endpoint, {
     Map<String, String>? additionalHeaders,
   }) async {
     final headers = <String, String>{
@@ -279,12 +280,14 @@ class HttpClient {
       'Accept': 'application/json',
       'Api-Access-Key': ApiEndpoints.apiAccessKey,
     };
-
-    final token = await _authService?.getAccessToken();
-    if (token != null && token.isNotEmpty) {
-      headers['Auth'] = 'Bearer $token';
+ 
+    if (!endpoint.contains('/auth/login')) {
+      final token = await _authService?.getAccessToken();
+      if (token != null && token.isNotEmpty) {
+        headers['Auth'] = 'Bearer $token';
+      }
     }
-
+ 
     if (additionalHeaders != null) {
       headers.addAll(additionalHeaders);
     }

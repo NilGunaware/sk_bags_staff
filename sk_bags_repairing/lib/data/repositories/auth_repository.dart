@@ -7,10 +7,19 @@ class AuthRepository {
 
   final ApiProvider _apiProvider;
 
-  Future<LoginResponse> login({required String mobileNumber, required String password, String expiryIn = '84600', String? branchId, required String role}) async {
-    ApiEndpoints.activeRole = role;
-    final payload = {'mobile_no': mobileNumber, 'password': password, 'branch_id': branchId, 'expiry_time': expiryIn};
-    if (role == 'staff' && branchId != null && branchId.isNotEmpty) {
+  Future<LoginResponse> login({
+    required String mobileNumber,
+    required String password,
+    String expiryIn = '86400',
+    String? branchId,
+    required String role,
+  }) async {
+    final payload = <String, dynamic>{
+      'mobile_no': mobileNumber,
+      'password': password,
+      'expiry_time': expiryIn,
+    };
+    if (branchId != null && branchId.isNotEmpty) {
       payload['branch_id'] = branchId;
     }
 

@@ -5,6 +5,7 @@ import '../../data/providers/api_provider.dart';
 import 'repair_create_controller.dart';
 import 'repair_detail_controller.dart';
 import 'repair_list_controller.dart';
+import 'karigar_list_controller.dart';
 
 class RepairsDependenciesBinding extends Bindings {
   @override
@@ -42,5 +43,13 @@ class RepairDetailBinding extends Bindings {
   void dependencies() {
     RepairsDependenciesBinding().dependencies();
     Get.lazyPut<RepairDetailController>(() => RepairDetailController());
+  }
+}
+
+class KarigarListBinding extends Bindings {
+  @override
+  void dependencies() {
+    RepairsDependenciesBinding().dependencies();
+    Get.lazyPut<KarigarListController>(() => KarigarListController());
   }
 }

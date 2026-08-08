@@ -13,7 +13,7 @@ Future<void> main() async {
   AppBinding().dependencies();
   final hasSession = await Get.find<AuthController>().hydrateSession();
   runApp(
-    RepairingApp(initialRoute: hasSession ? Routes.repairs : Routes.login),
+    RepairingApp(initialRoute: hasSession ? Routes.repairCreate : Routes.login),
   );
 }
 

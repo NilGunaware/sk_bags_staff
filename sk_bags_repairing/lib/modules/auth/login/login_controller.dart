@@ -80,7 +80,7 @@ class LoginController extends GetxController {
       final Map<String, dynamic> sessionData = {...response.data!, 'token': token, 'role': selectedRole, 'logged_in_at': DateTime.now().toIso8601String()};
 
       await _authController.saveSession(sessionData);
-      Get.offAllNamed(Routes.repairs);
+      Get.offAllNamed(Routes.repairCreate);
     } else {
       ApiResponseHandler.showErrorSnackbar(response.message ?? AppStrings.loginInvalidCredentials);
     }

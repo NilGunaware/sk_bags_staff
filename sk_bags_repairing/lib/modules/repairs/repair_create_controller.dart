@@ -183,7 +183,16 @@ class RepairCreateController extends GetxController {
 
       if (_repairService.isSuccessResponse(response)) {
         final message = _repairService.extractMessage(response);
-        Get.back(result: <String, dynamic>{if (isEditMode) 'updated': true else 'created': true, 'message': message.isEmpty ? (isEditMode ? 'Repair updated successfully' : 'Repair created successfully') : message});
+        final successMsg = message.isEmpty
+            ? (isEditMode ? 'Repair updated successfully' : 'Repair created successfully')
+            : message;
+        ApiResponseHandler.showSuccessSnackbar(successMsg);
+
+        if (Get.context != null && Navigator.canPop(Get.context!)) {
+          Get.back(result: <String, dynamic>{if (isEditMode) 'updated': true else 'created': true, 'message': successMsg});
+        } else {
+          await resetForm();
+        }
         return;
       }
 
@@ -227,5 +236,17 @@ class RepairCreateController extends GetxController {
     final text = value.trim();
     if (text.isEmpty) return null;
     return DateTime.tryParse(text);
+  }
+
+  Future<void> resetForm() async {
+    partyNameController.clear();
+    partyMobileController.clear();
+    notesController.clear();
+    items.clear();
+    repairUuid = DateTime.now().millisecondsSinceEpoch.toString();
+    editingRepairId = '';
+    isEditMode = false;
+    nextEntryNo.value = await _repairService.suggestNextEntryNo();
+    formVersion.value++;
   }
 }

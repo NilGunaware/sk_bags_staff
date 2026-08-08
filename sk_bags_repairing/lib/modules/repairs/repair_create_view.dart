@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../data/models/repair_models.dart';
+import '../../routes/app_routes.dart';
+import '../auth/controllers/auth_controller.dart';
 import 'repair_create_controller.dart';
 
 class RepairCreateView extends GetView<RepairCreateController> {
@@ -145,8 +147,20 @@ class RepairCreateView extends GetView<RepairCreateController> {
       child: Scaffold(
         backgroundColor: AppColors.scaffold,
         appBar: AppBar(
-          leading: IconButton(onPressed: _goBack, icon: const Icon(Icons.arrow_back)),
+          leading: Navigator.canPop(context)
+              ? IconButton(onPressed: _goBack, icon: const Icon(Icons.arrow_back))
+              : null,
           title: Text(controller.screenTitle),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Sign out',
+              onPressed: () async {
+                await Get.find<AuthController>().clearSession();
+                Get.offAllNamed(Routes.login);
+              },
+            ),
+          ],
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(

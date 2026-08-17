@@ -29,4 +29,8 @@ class ApiEndpoints {
   static const String repairStore = '/staff/repairing/store/0';
   static String repairStoreById(String repairId) => '/staff/repairing/store/$repairId';
   static const String repairDetail = '/staff/repairing/get_detail';
+
+  // Karigar Repairing (New)
+  static const String karigarRepairRead = '/staff/repairing/karigar_resp_list';
+  static const String karigarRepairDetail = '/staff/repairing/get_kp_detail';
 }

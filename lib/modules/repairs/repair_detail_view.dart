@@ -12,26 +12,24 @@ class RepairDetailView extends GetView<RepairDetailController> {
   const RepairDetailView({super.key});
 
   Future<void> _openUpdateRepair() async {
+    // Safety check: Don't allow edit if it's a Karigar repair
+    if (controller.isKarigar.value) return;
+
     final detail = controller.detail.value;
     if (detail == null || controller.isLoading.value) return;
 
     final result = await Get.toNamed(Routes.repairCreate, arguments: detail);
-    final updated =
-        result == true || (result is Map && result['updated'] == true);
+    final updated = result == true || (result is Map && result['updated'] == true);
     if (!updated) return;
 
     controller.wasUpdated = true;
     await controller.fetchDetail();
-    final message = result is Map
-        ? (result['message'] ?? 'Repair updated successfully').toString()
-        : 'Repair updated successfully';
+    final message = result is Map ? (result['message'] ?? 'Repair updated successfully').toString() : 'Repair updated successfully';
     ApiResponseHandler.showSuccessSnackbar(message);
   }
 
   void _goBack(BuildContext context) {
-    Navigator.of(context).pop<Map<String, dynamic>?>(
-      controller.wasUpdated ? <String, dynamic>{'updated': true} : null,
-    );
+    Navigator.of(context).pop<Map<String, dynamic>?>(controller.wasUpdated ? <String, dynamic>{'updated': true} : null);
   }
 
   @override
@@ -44,26 +42,23 @@ class RepairDetailView extends GetView<RepairDetailController> {
       child: Scaffold(
         backgroundColor: AppColors.scaffold,
         appBar: AppBar(
-          leading: IconButton(
-            onPressed: () => _goBack(context),
-            icon: const Icon(Icons.arrow_back),
-          ),
-          title: const Text('Repair Detail'),
+          leading: IconButton(onPressed: () => _goBack(context), icon: const Icon(Icons.arrow_back)),
+          title: Obx(() => Text(controller.isKarigar.value ? 'Karigar Detail' : 'Repair Detail')),
           actions: [
             Obx(() {
               final detail = controller.detail.value;
-              return IconButton(
-                onPressed: detail == null ? null : _openUpdateRepair,
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Edit repair',
-              );
+              // CONDITION: Hide edit button if data is from Karigar Repairing
+              if (controller.isKarigar.value) {
+                return const SizedBox.shrink();
+              }
+
+              return IconButton(onPressed: detail == null ? null : _openUpdateRepair, icon: const Icon(Icons.edit_outlined), tooltip: 'Edit repair');
             }),
           ],
         ),
         body: SafeArea(
           child: Obx(() {
-            final summary =
-                controller.detail.value?.summary ?? controller.repair.value;
+            final summary = controller.detail.value?.summary ?? controller.repair.value;
             final detail = controller.detail.value;
 
             if (controller.isLoading.value && detail == null) {
@@ -80,42 +75,18 @@ class RepairDetailView extends GetView<RepairDetailController> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                 children: [
-                  if (controller.errorMessage.value != null) ...[
-                    _Message(message: controller.errorMessage.value!),
-                    const SizedBox(height: 14),
-                  ],
+                  if (controller.errorMessage.value != null) ...[_Message(message: controller.errorMessage.value!), const SizedBox(height: 14)],
                   _Panel(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Repair #${summary.entryNo.isEmpty ? summary.id : summary.entryNo}',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        if (summary.uuid.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'UUID: ${summary.uuid}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                        Text('Repair #${summary.entryNo.isEmpty ? summary.id : summary.entryNo}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                         const SizedBox(height: 12),
                         _InfoRow(label: 'Party', value: summary.partyName),
                         _InfoRow(label: 'Mobile', value: summary.partyMobile),
                         _InfoRow(label: 'Entry Date', value: summary.entryDate),
-                        _InfoRow(
-                          label: 'Delivery',
-                          value: summary.deliveryDate,
-                        ),
-                        if (summary.notes.isNotEmpty)
-                          _InfoRow(label: 'Notes', value: summary.notes),
+                        _InfoRow(label: 'Delivery', value: summary.deliveryDate),
+                        if (summary.notes.isNotEmpty) _InfoRow(label: 'Notes', value: summary.notes),
                       ],
                     ),
                   ),
@@ -124,16 +95,10 @@ class RepairDetailView extends GetView<RepairDetailController> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: _Metric(
-                            label: 'QTY',
-                            value: '${summary.totalQty}',
-                          ),
+                          child: _Metric(label: 'QTY', value: '${summary.totalQty}'),
                         ),
                         Expanded(
-                          child: _Metric(
-                            label: 'Total Amount',
-                            value: _amount(summary.totalAmount),
-                          ),
+                          child: _Metric(label: 'Total Amount', value: _amount(summary.totalAmount)),
                         ),
                       ],
                     ),
@@ -143,24 +108,15 @@ class RepairDetailView extends GetView<RepairDetailController> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Items (${detail?.items.length ?? 0})',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                        Text('Items (${detail?.items.length ?? 0})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                         const SizedBox(height: 12),
                         if (detail == null || detail.items.isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 18),
-                            child: Center(
-                              child: Text('No repair items found.'),
-                            ),
+                            child: Center(child: Text('No repair items found.')),
                           )
                         else
-                          for (final item in detail.items)
-                            _RepairItemCard(item: item),
+                          for (final item in detail.items) _RepairItemCard(item: item),
                       ],
                     ),
                   ),
@@ -192,10 +148,7 @@ class _RepairItemCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            item.itemName,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-          ),
+          Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -203,18 +156,9 @@ class _RepairItemCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Qty',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
+                    Text('Qty', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                     const SizedBox(height: 2),
-                    Text(
-                      '${item.quantity}',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
+                    Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -222,34 +166,16 @@ class _RepairItemCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Total Amount',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
+                    Text('Total Amount', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                     const SizedBox(height: 2),
-                    Text(
-                      _amount(item.amount),
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
+                    Text(_amount(item.amount), style: const TextStyle(fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
             ],
           ),
-          if (item.instruction.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Instruction: ${item.instruction}',
-              style: TextStyle(color: Colors.grey.shade800, fontSize: 13),
-            ),
-          ],
-          if (item.attachments.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _AttachmentGrid(attachments: item.attachments),
-          ],
+          if (item.instruction.isNotEmpty) ...[const SizedBox(height: 8), Text('Instruction: ${item.instruction}', style: TextStyle(color: Colors.grey.shade800, fontSize: 13))],
+          if (item.attachments.isNotEmpty) ...[const SizedBox(height: 10), _AttachmentGrid(attachments: item.attachments)],
         ],
       ),
     );
@@ -274,11 +200,7 @@ class _AttachmentGrid extends StatelessWidget {
               child: InteractiveViewer(
                 minScale: 0.5,
                 maxScale: 4.0,
-                child: FallbackNetworkImage(
-                  imageUrls: [imageUrl],
-                  fit: BoxFit.contain,
-                  iconColor: Colors.white70,
-                ),
+                child: FallbackNetworkImage(imageUrls: [imageUrl], fit: BoxFit.contain, iconColor: Colors.white70),
               ),
             ),
             Positioned(
@@ -318,11 +240,7 @@ class _AttachmentGrid extends StatelessWidget {
                       width: 96,
                       height: 82,
                       color: Colors.white,
-                      child: FallbackNetworkImage(
-                        imageUrls: [attachment],
-                        iconColor: AppColors.primary,
-                        iconSize: 28,
-                      ),
+                      child: FallbackNetworkImage(imageUrls: [attachment], iconColor: AppColors.primary, iconSize: 28),
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -330,10 +248,7 @@ class _AttachmentGrid extends StatelessWidget {
                     _attachmentLabel(attachment),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -381,10 +296,7 @@ class _InfoRow extends StatelessWidget {
             child: Text(label, style: TextStyle(color: Colors.grey.shade700)),
           ),
           Expanded(
-            child: Text(
-              value.trim().isEmpty ? '-' : value,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
+            child: Text(value.trim().isEmpty ? '-' : value, style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -405,10 +317,7 @@ class _Metric extends StatelessWidget {
       children: [
         Text(label, style: TextStyle(color: Colors.grey.shade700)),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-        ),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
       ],
     );
   }
@@ -440,8 +349,6 @@ String _amount(double value) {
 
 String _attachmentLabel(String value) {
   final uri = Uri.tryParse(value);
-  final segment = uri?.pathSegments.isNotEmpty == true
-      ? uri!.pathSegments.last
-      : value.split('/').last;
+  final segment = uri?.pathSegments.isNotEmpty == true ? uri!.pathSegments.last : value.split('/').last;
   return segment.trim().isEmpty ? 'Attachment' : segment;
 }

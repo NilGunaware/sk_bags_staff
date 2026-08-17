@@ -14,10 +14,22 @@ class RepairService extends GetxService {
 
   final ApiProvider _apiProvider;
 
-  Future<RepairListPage> fetchRepairs({required int page, required int pageSize, String entryNo = '', String partyName = '', String partyMobile = '', String dateFrom = '', String dateTo = ''}) async {
+  Future<RepairListPage> fetchRepairs({
+    required int page,
+    required int pageSize,
+    bool isKarigar = false, // Added flag
+    String entryNo = '',
+    String partyName = '',
+    String partyMobile = '',
+    String dateFrom = '',
+    String dateTo = '',
+  }) async {
     final offset = (page - 1) * pageSize;
+    // Switch endpoint based on tab
+    final endpoint = isKarigar ? ApiEndpoints.karigarRepairRead : ApiEndpoints.repairRead;
+
     final response = await _apiProvider.post(
-      ApiEndpoints.repairRead,
+      endpoint,
       data: <String, dynamic>{
         'offset': offset,
         'search': <String, dynamic>{'entry_no': entryNo, 'date_from': dateFrom, 'date_to': dateTo, 'party_name': partyName, 'party_mobile': partyMobile},
@@ -25,7 +37,7 @@ class RepairService extends GetxService {
     );
 
     if (_isEmptyRepairList(response)) {
-      return const RepairListPage(repairs: <RepairSummaryModel>[], hasMore: false, totalCount: 0);
+      return const RepairListPage(repairs: [], hasMore: false, totalCount: 0);
     }
 
     _ensureRepairResponseOk(response, fallbackMessage: 'Could not load repairs.');
@@ -37,13 +49,18 @@ class RepairService extends GetxService {
     return RepairListPage(repairs: records, hasMore: totalCount > 0 ? offset + records.length < totalCount : records.length >= pageSize, totalCount: totalCount);
   }
 
-  Future<RepairDetailModel> fetchRepairDetail(String repairId) async {
-    final response = await _apiProvider.get('${ApiEndpoints.repairDetail}/$repairId');
+  Future<RepairDetailModel> fetchRepairDetail(String repairId, {bool isKarigar = false}) async {
+    // Switch endpoint based on type
+    final endpoint = isKarigar ? '${ApiEndpoints.karigarRepairDetail}/$repairId' : '${ApiEndpoints.repairDetail}/$repairId';
+
+    final response = await _apiProvider.get(endpoint);
+
     _ensureRepairResponseOk(response, fallbackMessage: 'Could not load repair details.');
 
     final data = _dataMap(response);
     final summary = RepairSummaryModel.fromJson(data);
-    final itemSource = data['items'] ?? data['record'] ?? data['records'] ?? response['items'] ?? response['record'] ?? response['records'] ?? const <dynamic>[];
+    final itemSource = data['items'] ?? data['record'] ?? const <dynamic>[];
+
     final items = itemSource is List ? itemSource.whereType<Map>().map((item) => RepairItemModel.fromJson(Map<String, dynamic>.from(item))).toList() : <RepairItemModel>[];
 
     return RepairDetailModel(summary: summary, items: items, raw: data);

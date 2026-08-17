@@ -167,14 +167,16 @@ class RepairDraftItem {
   final List<String> attachmentPaths;
   final List<String> existingAttachments;
 
-  double get amount => quantity * rate;
+  double get amount => rate;
+
+  double get apiRate => quantity <= 0 ? 0 : amount / quantity;
 
   Map<String, dynamic> toApiJson() {
     return <String, dynamic>{
       'id': id.trim().isEmpty ? 0 : id,
       'item_name': itemName.trim(),
       'qty': quantity,
-      'rate': rate,
+      'rate': apiRate,
       'amt': amount,
       'instruction': instruction.trim(),
       'attatch_data': existingAttachments,

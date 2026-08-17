@@ -81,18 +81,25 @@ class RepairCreateController extends GetxController {
     }
   }
 
-  int get totalQuantity => items.fold<int>(0, (sum, item) => sum + item.quantity);
+  int get totalQuantity =>
+      items.fold<int>(0, (sum, item) => sum + item.quantity);
 
-  double get totalAmount => items.fold<double>(0, (sum, item) => sum + item.amount);
+  double get totalAmount =>
+      items.fold<double>(0, (sum, item) => sum + item.amount);
 
   double get advanceAmount => 0;
   // double.tryParse(advanceController.text.trim()) ?? 0;
 
   double get balanceAmount => totalAmount - advanceAmount;
 
-  String get entryDate => isEditMode && editingEntryDate.trim().isNotEmpty ? editingEntryDate.trim() : _formatApiDate(DateTime.now());
+  String get entryDate => isEditMode && editingEntryDate.trim().isNotEmpty
+      ? editingEntryDate.trim()
+      : _formatApiDate(DateTime.now());
 
-  String get displayEntryDate => isEditMode && editingEntryDate.trim().isNotEmpty ? editingEntryDate.trim() : _formatDisplayDate(DateTime.now());
+  String get displayEntryDate =>
+      isEditMode && editingEntryDate.trim().isNotEmpty
+      ? editingEntryDate.trim()
+      : _formatDisplayDate(DateTime.now());
 
   String get displayDeliveryDate => _formatDisplayDate(deliveryDate.value);
 
@@ -104,7 +111,10 @@ class RepairCreateController extends GetxController {
 
   Future<String?> captureAttachment() async {
     try {
-      final image = await _imagePicker.pickImage(source: ImageSource.camera, imageQuality: 85);
+      final image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
       return image?.path;
     } catch (error, stackTrace) {
       _handleAttachmentPickerError(error, stackTrace);
@@ -124,8 +134,13 @@ class RepairCreateController extends GetxController {
 
   void _handleAttachmentPickerError(Object error, StackTrace stackTrace) {
     debugPrint('Attachment picker error: $error\n$stackTrace');
-    final isChannelError = error is PlatformException && error.code == 'channel-error';
-    ApiResponseHandler.showErrorSnackbar(isChannelError ? 'Attachment picker is not available. Close and reopen the updated app.' : 'Could not open the attachment picker. Please try again.');
+    final isChannelError =
+        error is PlatformException && error.code == 'channel-error';
+    ApiResponseHandler.showErrorSnackbar(
+      isChannelError
+          ? 'Attachment picker is not available. Close and reopen the updated app.'
+          : 'Could not open the attachment picker. Please try again.',
+    );
   }
 
   void addItem(RepairDraftItem item) {
@@ -141,8 +156,6 @@ class RepairCreateController extends GetxController {
     if (index < 0 || index >= items.length) return;
     items.removeAt(index);
   }
-
-
 
   Future<void> submit() async {
     if (isSubmitting.value) return;
@@ -163,7 +176,9 @@ class RepairCreateController extends GetxController {
               partyName: partyNameController.text,
               partyMobile: partyMobileController.text,
               advanceAmount: advanceAmount,
-              deliveryDate: _formatApiDate(deliveryDate.value ?? DateTime.now()),
+              deliveryDate: _formatApiDate(
+                deliveryDate.value ?? DateTime.now(),
+              ),
               notes: notesController.text,
               items: items.toList(),
             )
@@ -174,21 +189,40 @@ class RepairCreateController extends GetxController {
               partyName: partyNameController.text,
               partyMobile: partyMobileController.text,
               advanceAmount: advanceAmount,
-              deliveryDate: _formatApiDate(deliveryDate.value ?? DateTime.now()),
+              deliveryDate: _formatApiDate(
+                deliveryDate.value ?? DateTime.now(),
+              ),
               notes: notesController.text,
               items: items.toList(),
             );
 
       if (_repairService.isSuccessResponse(response)) {
         final message = _repairService.extractMessage(response);
-        Get.back(result: <String, dynamic>{if (isEditMode) 'updated': true else 'created': true, 'message': message.isEmpty ? (isEditMode ? 'Repair updated successfully' : 'Repair created successfully') : message});
+        Get.back(
+          result: <String, dynamic>{
+            if (isEditMode) 'updated': true else 'created': true,
+            'message': message.isEmpty
+                ? (isEditMode
+                      ? 'Repair updated successfully'
+                      : 'Repair created successfully')
+                : message,
+          },
+        );
         return;
       }
 
       final message = _repairService.extractMessage(response);
-      ApiResponseHandler.showErrorSnackbar(message.isEmpty ? (isEditMode ? 'Could not update repair' : 'Could not create repair') : message);
+      ApiResponseHandler.showErrorSnackbar(
+        message.isEmpty
+            ? (isEditMode
+                  ? 'Could not update repair'
+                  : 'Could not create repair')
+            : message,
+      );
     } catch (_) {
-      ApiResponseHandler.showErrorSnackbar(isEditMode ? 'Could not update repair' : 'Could not create repair');
+      ApiResponseHandler.showErrorSnackbar(
+        isEditMode ? 'Could not update repair' : 'Could not create repair',
+      );
     } finally {
       isSubmitting.value = false;
     }
@@ -199,14 +233,28 @@ class RepairCreateController extends GetxController {
     isEditMode = true;
     editingRepairId = summary.id;
     editingEntryDate = summary.entryDate;
-    repairUuid = summary.uuid.trim().isEmpty || summary.uuid.trim() == '0' ? DateTime.now().millisecondsSinceEpoch.toString() : summary.uuid;
+    repairUuid = summary.uuid.trim().isEmpty || summary.uuid.trim() == '0'
+        ? DateTime.now().millisecondsSinceEpoch.toString()
+        : summary.uuid;
     nextEntryNo.value = int.tryParse(summary.entryNo) ?? 0;
     partyNameController.text = summary.partyName;
     partyMobileController.text = summary.partyMobile;
     // advanceController.text = _amountString(summary.advanceAmount);
     notesController.text = summary.notes;
     deliveryDate.value = _parseApiDate(summary.deliveryDate);
-    items.assignAll(detail.items.map((item) => RepairDraftItem(id: item.id, itemName: item.itemName, quantity: item.quantity <= 0 ? 1 : item.quantity, rate: item.rate, instruction: item.instruction, attachmentPaths: const <String>[], existingAttachments: item.attachments)));
+    items.assignAll(
+      detail.items.map(
+        (item) => RepairDraftItem(
+          id: item.id,
+          itemName: item.itemName,
+          quantity: item.quantity <= 0 ? 1 : item.quantity,
+          rate: item.amount > 0 ? item.amount : item.rate * item.quantity,
+          instruction: item.instruction,
+          attachmentPaths: const <String>[],
+          existingAttachments: item.attachments,
+        ),
+      ),
+    );
   }
 
   String _formatApiDate(DateTime value) {
@@ -226,5 +274,4 @@ class RepairCreateController extends GetxController {
     if (text.isEmpty) return null;
     return DateTime.tryParse(text);
   }
-
 }

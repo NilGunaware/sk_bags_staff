@@ -15,7 +15,7 @@ class RepairCreateView extends GetView<RepairCreateController> {
     final existing = index == null ? null : controller.items[index];
     final itemNameController = TextEditingController(text: existing?.itemName.trim().isNotEmpty == true ? existing!.itemName : 'Repair Item');
     final qtyController = TextEditingController(text: (existing?.quantity ?? 1).toString());
-    final rateController = TextEditingController(text: _amount(existing?.rate ?? 0));
+    final rateController = TextEditingController(text: _amount(existing?.amount ?? 0));
     final instructionController = TextEditingController(text: existing?.instruction ?? '');
     final existingAttachments = (existing?.existingAttachments.toList() ?? <String>[]).obs;
     final attachments = (existing?.attachmentPaths.toList() ?? <String>[]).obs;
@@ -44,7 +44,7 @@ class RepairCreateView extends GetView<RepairCreateController> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: TextField(controller: rateController, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))], decoration: _inputDecoration('Rate', Icons.currency_rupee)),
+                        child: TextField(controller: rateController, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))], decoration: _inputDecoration('Total Amount', Icons.currency_rupee)),
                       ),
                     ],
                   ),
@@ -78,11 +78,11 @@ class RepairCreateView extends GetView<RepairCreateController> {
                       onPressed: () {
                         final name = itemNameController.text.trim();
                         final qty = int.tryParse(qtyController.text) ?? 0;
-                        final rate = double.tryParse(rateController.text) ?? 0;
-                        if (name.isEmpty || qty <= 0) {
+                        final totalAmount = double.tryParse(rateController.text) ?? 0;
+                        if (name.isEmpty || qty <= 0 || totalAmount <= 0) {
                           return;
                         }
-                        final item = RepairDraftItem(id: existing?.id ?? '', itemName: name, quantity: qty, rate: rate, instruction: instructionController.text, attachmentPaths: attachments.toList(), existingAttachments: existingAttachments.toList());
+                        final item = RepairDraftItem(id: existing?.id ?? '', itemName: name, quantity: qty, rate: totalAmount, instruction: instructionController.text, attachmentPaths: attachments.toList(), existingAttachments: existingAttachments.toList());
                         if (index == null) {
                           controller.addItem(item);
                         } else {
@@ -147,9 +147,7 @@ class RepairCreateView extends GetView<RepairCreateController> {
       child: Scaffold(
         backgroundColor: AppColors.scaffold,
         appBar: AppBar(
-          leading: Navigator.canPop(context)
-              ? IconButton(onPressed: _goBack, icon: const Icon(Icons.arrow_back))
-              : null,
+          leading: Navigator.canPop(context) ? IconButton(onPressed: _goBack, icon: const Icon(Icons.arrow_back)) : null,
           title: Text(controller.screenTitle),
           actions: [
             IconButton(
@@ -275,19 +273,29 @@ class RepairCreateView extends GetView<RepairCreateController> {
                             // const SizedBox(height: 12),
                             TextField(controller: controller.notesController, minLines: 2, maxLines: 4, decoration: _inputDecoration('Notes', Icons.notes_outlined)),
                             const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _Metric(label: 'Total Qty', value: '${controller.totalQuantity}'),
-                                ),
-                                Expanded(
-                                  child: _Metric(label: 'Total', value: _amount(controller.totalAmount)),
-                                ),
-                                Expanded(
-                                  child: _Metric(label: 'Balance', value: _amount(controller.balanceAmount)),
-                                ),
-                              ],
-                            ),
+
+                            // Row(
+                            //   children: [
+                            //     Expanded(
+                            //       child: _Metric(
+                            //         label: 'Total Qty',
+                            //         value: '${controller.totalQuantity}',
+                            //       ),
+                            //     ),
+                            //     Expanded(
+                            //       child: _Metric(
+                            //         label: 'Total',
+                            //         value: _amount(controller.totalAmount),
+                            //       ),
+                            //     ),
+                            //     Expanded(
+                            //       child: _Metric(
+                            //         label: 'Balance',
+                            //         value: _amount(controller.balanceAmount),
+                            //       ),
+                            //     ),
+                            //   ],
+                            // ),
                           ],
                         ),
                       ),
@@ -358,7 +366,8 @@ class _DraftRepairTile extends StatelessWidget {
               children: [
                 Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
-                Text('${item.quantity} x ${_amount(item.rate)} = ${_amount(item.amount)}'),
+                Text('Qty: ${item.quantity}'),
+                Text('Total Amount: ${_amount(item.amount)}'),
                 if (item.attachmentPaths.isNotEmpty) Text('${item.attachmentPaths.length} attachment(s)'),
                 if (item.existingAttachments.isNotEmpty) Text('${item.existingAttachments.length} saved attachment(s)'),
               ],

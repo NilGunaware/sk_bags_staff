@@ -25,12 +25,35 @@ class LocalItemSyncService extends GetxService {
       eagerError: false,
     );
 
-    return <String, bool>{
-      for (final outcome in outcomes)
-        outcome.serverName: outcome.isReachable &&
-            (outcome.statusCode == null || (outcome.statusCode! >= 200 && outcome.statusCode! < 400)) &&
-            (outcome.response == null || _isHealthyResponse(outcome.response!)),
-    };
+    final healthMap = <String, bool>{};
+    for (final outcome in outcomes) {
+      bool isHealthy = _evalOutcomeHealthy(outcome);
+
+      // If initial ping failed, perform 1 immediate retry ping before declaring offline
+      if (!isHealthy) {
+        final server = _servers.firstWhere((s) => s.name == outcome.serverName);
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        final retryOutcome = await _fetchJsonOutcome(
+          serverName: server.name,
+          baseUrl: server.baseUrl,
+          endpointPath: '/health',
+        );
+        isHealthy = _evalOutcomeHealthy(retryOutcome);
+      }
+
+      healthMap[outcome.serverName] = isHealthy;
+    }
+
+    return healthMap;
+  }
+
+  bool _evalOutcomeHealthy(_FetchOutcome outcome) {
+    if (!outcome.isReachable) return false;
+    if (outcome.statusCode != null && outcome.statusCode! >= 500) return false;
+    if (outcome.response != null) {
+      return _isHealthyResponse(outcome.response!);
+    }
+    return true;
   }
 
   Future<List<PriceCategoryModel>> fetchPriceCategories() async {
@@ -431,7 +454,7 @@ class LocalItemSyncService extends GetxService {
     ).replace(queryParameters: queryParameters);
 
     _logApiRequest('GET', uri, body: <String, dynamic>{});
-    final http.Response response;
+    http.Response response;
     try {
       response = await _client.get(
         uri,
@@ -441,8 +464,24 @@ class LocalItemSyncService extends GetxService {
         },
       ).timeout(_serverTimeout);
     } catch (error) {
-      _logApiError('GET', uri, error);
-      rethrow;
+      // Retry once with a fresh one-off client in case pooled TCP socket died on mobile
+      try {
+        final freshClient = http.Client();
+        try {
+          response = await freshClient.get(
+            uri,
+            headers: const <String, String>{
+              'Accept': 'application/json, text/plain, */*',
+              'User-Agent': 'SKBagsStaff/1.0',
+            },
+          ).timeout(_serverTimeout);
+        } finally {
+          freshClient.close();
+        }
+      } catch (retryError) {
+        _logApiError('GET', uri, retryError);
+        rethrow;
+      }
     }
     _logApiResponse(uri, response);
     if (response.statusCode < 200 || response.statusCode >= 300) {

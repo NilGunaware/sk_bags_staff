@@ -35,6 +35,7 @@ class RepairCreateController extends GetxController {
   final nextEntryNo = 1.obs;
   final deliveryDate = Rxn<DateTime>();
   final formVersion = 0.obs;
+  final orderStatus = 0.obs;
 
   late final String repairUuid;
   bool isEditMode = false;
@@ -180,6 +181,7 @@ class RepairCreateController extends GetxController {
                 deliveryDate.value ?? DateTime.now(),
               ),
               notes: notesController.text,
+              status: orderStatus.value,
               items: items.toList(),
             )
           : await _repairService.createRepair(
@@ -193,6 +195,7 @@ class RepairCreateController extends GetxController {
                 deliveryDate.value ?? DateTime.now(),
               ),
               notes: notesController.text,
+              status: orderStatus.value,
               items: items.toList(),
             );
 
@@ -241,6 +244,7 @@ class RepairCreateController extends GetxController {
     partyMobileController.text = summary.partyMobile;
     // advanceController.text = _amountString(summary.advanceAmount);
     notesController.text = summary.notes;
+    orderStatus.value = summary.status;
     deliveryDate.value = _parseApiDate(summary.deliveryDate);
     items.assignAll(
       detail.items.map(
@@ -250,6 +254,7 @@ class RepairCreateController extends GetxController {
           quantity: item.quantity <= 0 ? 1 : item.quantity,
           rate: item.amount > 0 ? item.amount : item.rate * item.quantity,
           instruction: item.instruction,
+          status: item.status,
           attachmentPaths: const <String>[],
           existingAttachments: item.attachments,
         ),

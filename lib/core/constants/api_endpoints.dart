@@ -3,7 +3,7 @@ class ApiEndpoints {
   static const String baseUrl = '$interlinkServerUrl/sk_bags/api/v1';
   static const String ahmLabel = 'SK ENTERPRISE';
   static const String bhuLabel = 'SS MOVE ON THRILL BAGS LLP';
-  static const String ahmItemsBaseUrl = 'http://182.70.120.80:8008';
+  static const String ahmItemsBaseUrl = 'http://112.140.190.248:8008';
   static const String bhuItemsBaseUrl = 'http://150.107.237.206:8009';
 
   static const String login = '/staff/auth/login';

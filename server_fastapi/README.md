@@ -51,7 +51,7 @@ The desktop app will:
 - still allow manual database name entry when you need a specific company/year database
 - let you set the API service port, defaulting to `8000`
 - auto-detect the router/public IP on startup and set the service port for known sites:
-  - `182.70.120.80` -> SK ENTERPRISE -> `8008`
+  - `112.140.190.248` -> SK ENTERPRISE -> `8008`
   - `150.107.237.206` -> SS MOVE ON THRILL BAGS LLP -> `8009`
 - skip service port auto-detect when a port is already saved in `.env`
 - save those values locally in `server_fastapi/.env`
@@ -94,7 +94,7 @@ AUTO_PORT_BY_PUBLIC_IP=true
 
 Current rules:
 
-- `182.70.120.80` starts on port `8008`
+- `112.140.190.248` starts on port `8008`
 - `150.107.237.206` starts on port `8009`
 
 If `PORT` is already saved in `.env`, the launcher keeps that saved port and skips public IP auto-detect. If the public IP check fails or the public IP is unknown, the launcher keeps the entered/default port.

@@ -60,7 +60,7 @@ PUBLIC_IP_CHECK_URLS = (
     "https://ifconfig.me/ip",
 )
 PUBLIC_IP_PORT_RULES = {
-    "182.70.120.80": ("SK ENTERPRISE", "8008"),
+    "112.140.190.248": ("SK ENTERPRISE", "8008"),
     "150.107.237.206": ("SS MOVE ON THRILL BAGS LLP", "8009"),
 }
 

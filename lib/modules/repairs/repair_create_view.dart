@@ -10,24 +10,46 @@ class RepairCreateView extends GetView<RepairCreateController> {
   const RepairCreateView({super.key});
 
   Future<void> _pickDeliveryDate(BuildContext context) async {
-    final picked = await showDatePicker(context: context, initialDate: controller.deliveryDate.value ?? DateTime.now().add(const Duration(days: 7)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 730)));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate:
+          controller.deliveryDate.value ??
+          DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
+    );
     if (picked != null) controller.deliveryDate.value = picked;
   }
 
   Future<void> _openItemSheet({int? index}) async {
     final existing = index == null ? null : controller.items[index];
-    final itemNameController = TextEditingController(text: existing?.itemName ?? '');
-    final qtyController = TextEditingController(text: (existing?.quantity ?? 1).toString());
-    final rateController = TextEditingController(text: _amount(existing?.amount ?? 0));
-    final instructionController = TextEditingController(text: existing?.instruction ?? '');
-    final existingAttachments = (existing?.existingAttachments.toList() ?? <String>[]).obs;
+    final itemNameController = TextEditingController(
+      text: existing?.itemName ?? '',
+    );
+    final qtyController = TextEditingController(
+      text: (existing?.quantity ?? 1).toString(),
+    );
+    final rateController = TextEditingController(
+      text: _amount(existing?.amount ?? 0),
+    );
+    final instructionController = TextEditingController(
+      text: existing?.instruction ?? '',
+    );
+    final preservedItemStatus = existing?.status ?? 0;
+    final existingAttachments =
+        (existing?.existingAttachments.toList() ?? <String>[]).obs;
     final attachments = (existing?.attachmentPaths.toList() ?? <String>[]).obs;
 
     try {
       await Get.bottomSheet<void>(
         SafeArea(
           child: Container(
-            padding: EdgeInsets.only(left: 18, right: 18, top: 18, bottom: MediaQuery.of(Get.context!).viewInsets.bottom + 18),
+            padding: EdgeInsets.only(
+              left: 18,
+              right: 18,
+              top: 18,
+              bottom: MediaQuery.of(Get.context!).viewInsets.bottom + 18,
+            ),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
@@ -37,23 +59,68 @@ class RepairCreateView extends GetView<RepairCreateController> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(index == null ? 'Add Repair Item' : 'Edit Repair Item', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                  Text(
+                    index == null ? 'Add Repair Item' : 'Edit Repair Item',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  TextField(controller: itemNameController, decoration: _inputDecoration('Item Name', Icons.home_repair_service_outlined), textInputAction: TextInputAction.next),
+                  TextField(
+                    controller: itemNameController,
+                    decoration: _inputDecoration(
+                      'Item Name',
+                      Icons.home_repair_service_outlined,
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(controller: qtyController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: _inputDecoration('Qty', Icons.inventory_2_outlined)),
+                        child: TextField(
+                          controller: qtyController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: _inputDecoration(
+                            'Qty',
+                            Icons.inventory_2_outlined,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: TextField(controller: rateController, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))], decoration: _inputDecoration('Total Amount', Icons.currency_rupee)),
+                        child: TextField(
+                          controller: rateController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,2}'),
+                            ),
+                          ],
+                          decoration: _inputDecoration(
+                            'Total Amount',
+                            Icons.currency_rupee,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  TextField(controller: instructionController, minLines: 2, maxLines: 4, decoration: _inputDecoration('Instruction', Icons.notes_outlined)),
+                  TextField(
+                    controller: instructionController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: _inputDecoration(
+                      'Instruction',
+                      Icons.notes_outlined,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Obx(
                     () => Wrap(
@@ -63,20 +130,30 @@ class RepairCreateView extends GetView<RepairCreateController> {
                         for (final url in existingAttachments)
                           InputChip(
                             avatar: const Icon(Icons.cloud_done, size: 16),
-                            label: Text(_attachmentLabel(url), overflow: TextOverflow.ellipsis),
+                            label: Text(
+                              _attachmentLabel(url),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             onDeleted: () => existingAttachments.remove(url),
                           ),
                         for (final path in attachments)
                           Chip(
                             avatar: const Icon(Icons.attach_file, size: 16),
-                            label: Text(path.split('/').last, overflow: TextOverflow.ellipsis),
+                            label: Text(
+                              path.split('/').last,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             onDeleted: () => attachments.remove(path),
                           ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(onPressed: () => _addAttachments(attachments), icon: const Icon(Icons.attach_file), label: const Text('Add Attachment')),
+                  OutlinedButton.icon(
+                    onPressed: () => _addAttachments(attachments),
+                    icon: const Icon(Icons.attach_file),
+                    label: const Text('Add Attachment'),
+                  ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -84,11 +161,21 @@ class RepairCreateView extends GetView<RepairCreateController> {
                       onPressed: () {
                         final name = itemNameController.text.trim();
                         final qty = int.tryParse(qtyController.text) ?? 0;
-                        final totalAmount = double.tryParse(rateController.text) ?? 0;
+                        final totalAmount =
+                            double.tryParse(rateController.text) ?? 0;
                         if (name.isEmpty || qty <= 0 || totalAmount <= 0) {
                           return;
                         }
-                        final item = RepairDraftItem(id: existing?.id ?? '', itemName: name, quantity: qty, rate: totalAmount, instruction: instructionController.text, attachmentPaths: attachments.toList(), existingAttachments: existingAttachments.toList());
+                        final item = RepairDraftItem(
+                          id: existing?.id ?? '',
+                          itemName: name,
+                          quantity: qty,
+                          rate: totalAmount,
+                          instruction: instructionController.text,
+                          status: preservedItemStatus,
+                          attachmentPaths: attachments.toList(),
+                          existingAttachments: existingAttachments.toList(),
+                        );
                         if (index == null) {
                           controller.addItem(item);
                         } else {
@@ -129,8 +216,18 @@ class RepairCreateView extends GetView<RepairCreateController> {
           children: [
             const _SectionTitle('Add Attachment'),
             const SizedBox(height: 8),
-            ListTile(leading: const Icon(Icons.camera_alt_outlined), title: const Text('Camera'), subtitle: const Text('Take a new photo'), onTap: () => Navigator.pop(context, _AttachmentSource.camera)),
-            ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('Gallery'), subtitle: const Text('Choose one or more photos'), onTap: () => Navigator.pop(context, _AttachmentSource.gallery)),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Camera'),
+              subtitle: const Text('Take a new photo'),
+              onTap: () => Navigator.pop(context, _AttachmentSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Gallery'),
+              subtitle: const Text('Choose one or more photos'),
+              onTap: () => Navigator.pop(context, _AttachmentSource.gallery),
+            ),
           ],
         ),
       ),
@@ -158,7 +255,10 @@ class RepairCreateView extends GetView<RepairCreateController> {
       child: Scaffold(
         backgroundColor: AppColors.scaffold,
         appBar: AppBar(
-          leading: IconButton(onPressed: _goBack, icon: const Icon(Icons.arrow_back)),
+          leading: IconButton(
+            onPressed: _goBack,
+            icon: const Icon(Icons.arrow_back),
+          ),
           title: Text(controller.screenTitle),
         ),
         bottomNavigationBar: SafeArea(
@@ -166,9 +266,24 @@ class RepairCreateView extends GetView<RepairCreateController> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Obx(
               () => ElevatedButton.icon(
-                onPressed: controller.isSubmitting.value ? null : controller.submit,
-                icon: controller.isSubmitting.value ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save_outlined),
-                label: Text(controller.isSubmitting.value ? controller.submittingLabel : controller.submitLabel),
+                onPressed: controller.isSubmitting.value
+                    ? null
+                    : controller.submit,
+                icon: controller.isSubmitting.value
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(
+                  controller.isSubmitting.value
+                      ? controller.submittingLabel
+                      : controller.submitLabel,
+                ),
                 style: ElevatedButton.styleFrom(minimumSize: const Size(0, 54)),
               ),
             ),
@@ -188,12 +303,31 @@ class RepairCreateView extends GetView<RepairCreateController> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: _Metric(label: 'Entry No', value: '#${controller.nextEntryNo.value}'),
+                              child: _Metric(
+                                label: 'Entry No',
+                                value: '#${controller.nextEntryNo.value}',
+                              ),
                             ),
                             Expanded(
-                              child: _Metric(label: 'Entry Date', value: controller.displayEntryDate),
+                              child: _Metric(
+                                label: 'Entry Date',
+                                value: controller.displayEntryDate,
+                              ),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _Panel(
+                        child: DropdownButtonFormField<int>(
+                          initialValue: controller.orderStatus.value,
+                          decoration: _inputDecoration(
+                            'Order Status',
+                            Icons.flag_outlined,
+                          ),
+                          items: _statusItems(),
+                          onChanged: (value) =>
+                              controller.orderStatus.value = value ?? 0,
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -203,13 +337,24 @@ class RepairCreateView extends GetView<RepairCreateController> {
                           children: [
                             const _SectionTitle('Party Details'),
                             const SizedBox(height: 12),
-                            TextFormField(controller: controller.partyNameController, validator: (value) => (value ?? '').trim().isEmpty ? 'Party name is required' : null, decoration: _inputDecoration('Party Name', Icons.person_outline)),
+                            TextFormField(
+                              controller: controller.partyNameController,
+                              validator: (value) => (value ?? '').trim().isEmpty
+                                  ? 'Party name is required'
+                                  : null,
+                              decoration: _inputDecoration(
+                                'Party Name',
+                                Icons.person_outline,
+                              ),
+                            ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: controller.partyMobileController,
                               keyboardType: TextInputType.phone,
                               maxLength: 10,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
                               validator: (value) {
                                 final text = (value ?? '').trim();
                                 if (text.length < 10) {
@@ -217,10 +362,19 @@ class RepairCreateView extends GetView<RepairCreateController> {
                                 }
                                 return null;
                               },
-                              decoration: _inputDecoration('Mobile No', Icons.phone_outlined),
+                              decoration: _inputDecoration(
+                                'Mobile No',
+                                Icons.phone_outlined,
+                              ),
                             ),
                             const SizedBox(height: 4),
-                            OutlinedButton.icon(onPressed: () => _pickDeliveryDate(context), icon: const Icon(Icons.event_available_outlined), label: Text('Delivery: ${controller.displayDeliveryDate}')),
+                            OutlinedButton.icon(
+                              onPressed: () => _pickDeliveryDate(context),
+                              icon: const Icon(Icons.event_available_outlined),
+                              label: Text(
+                                'Delivery: ${controller.displayDeliveryDate}',
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -231,15 +385,23 @@ class RepairCreateView extends GetView<RepairCreateController> {
                           children: [
                             Row(
                               children: [
-                                const Expanded(child: _SectionTitle('Repair Items')),
-                                IconButton.filledTonal(onPressed: () => _openItemSheet(), icon: const Icon(Icons.add), tooltip: 'Add item'),
+                                const Expanded(
+                                  child: _SectionTitle('Repair Items'),
+                                ),
+                                IconButton.filledTonal(
+                                  onPressed: () => _openItemSheet(),
+                                  icon: const Icon(Icons.add),
+                                  tooltip: 'Add item',
+                                ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             if (controller.items.isEmpty)
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 24),
-                                child: Center(child: Text('No repair item added yet.')),
+                                child: Center(
+                                  child: Text('No repair item added yet.'),
+                                ),
                               )
                             else
                               for (var i = 0; i < controller.items.length; i++)
@@ -271,7 +433,15 @@ class RepairCreateView extends GetView<RepairCreateController> {
                             //   ),
                             // ),
                             // const SizedBox(height: 12),
-                            TextField(controller: controller.notesController, minLines: 2, maxLines: 4, decoration: _inputDecoration('Notes', Icons.notes_outlined)),
+                            TextField(
+                              controller: controller.notesController,
+                              minLines: 2,
+                              maxLines: 4,
+                              decoration: _inputDecoration(
+                                'Notes',
+                                Icons.notes_outlined,
+                              ),
+                            ),
                             const SizedBox(height: 14),
                             // Row(
                             //   children: [
@@ -318,7 +488,11 @@ class RepairCreateView extends GetView<RepairCreateController> {
 enum _AttachmentSource { camera, gallery }
 
 class _DraftRepairTile extends StatelessWidget {
-  const _DraftRepairTile({required this.item, required this.onEdit, required this.onDelete});
+  const _DraftRepairTile({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final RepairDraftItem item;
   final VoidCallback onEdit;
@@ -340,17 +514,27 @@ class _DraftRepairTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text(
+                  item.itemName,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 4),
                 Text('Qty: ${item.quantity}'),
                 Text('Total Amount: ${_amount(item.amount)}'),
-                if (item.attachmentPaths.isNotEmpty) Text('${item.attachmentPaths.length} attachment(s)'),
-                if (item.existingAttachments.isNotEmpty) Text('${item.existingAttachments.length} saved attachment(s)'),
+                if (item.attachmentPaths.isNotEmpty)
+                  Text('${item.attachmentPaths.length} attachment(s)'),
+                if (item.existingAttachments.isNotEmpty)
+                  Text(
+                    '${item.existingAttachments.length} saved attachment(s)',
+                  ),
               ],
             ),
           ),
           IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
-          IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline)),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+          ),
         ],
       ),
     );
@@ -383,7 +567,10 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900));
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+    );
   }
 }
 
@@ -400,10 +587,21 @@ class _Metric extends StatelessWidget {
       children: [
         Text(label, style: TextStyle(color: Colors.grey.shade700)),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+        ),
       ],
     );
   }
+}
+
+List<DropdownMenuItem<int>> _statusItems() {
+  return const [
+    DropdownMenuItem(value: 0, child: Text('Pending')),
+    DropdownMenuItem(value: 1, child: Text('Delivered')),
+    DropdownMenuItem(value: 2, child: Text('Cancelled')),
+  ];
 }
 
 InputDecoration _inputDecoration(String label, IconData icon) {
@@ -423,6 +621,8 @@ String _amount(double value) {
 
 String _attachmentLabel(String value) {
   final uri = Uri.tryParse(value);
-  final segment = uri?.pathSegments.isNotEmpty == true ? uri!.pathSegments.last : value.split('/').last;
+  final segment = uri?.pathSegments.isNotEmpty == true
+      ? uri!.pathSegments.last
+      : value.split('/').last;
   return segment.trim().isEmpty ? 'Attachment' : segment;
 }

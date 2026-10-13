@@ -26,13 +26,21 @@ class RepairService extends GetxService {
   }) async {
     final offset = (page - 1) * pageSize;
     // Switch endpoint based on tab
-    final endpoint = isKarigar ? ApiEndpoints.karigarRepairRead : ApiEndpoints.repairRead;
+    final endpoint = isKarigar
+        ? ApiEndpoints.karigarRepairRead
+        : ApiEndpoints.repairRead;
 
     final response = await _apiProvider.post(
       endpoint,
       data: <String, dynamic>{
         'offset': offset,
-        'search': <String, dynamic>{'entry_no': entryNo, 'date_from': dateFrom, 'date_to': dateTo, 'party_name': partyName, 'party_mobile': partyMobile},
+        'search': <String, dynamic>{
+          'entry_no': entryNo,
+          'date_from': dateFrom,
+          'date_to': dateTo,
+          'party_name': partyName,
+          'party_mobile': partyMobile,
+        },
       },
     );
 
@@ -40,33 +48,64 @@ class RepairService extends GetxService {
       return const RepairListPage(repairs: [], hasMore: false, totalCount: 0);
     }
 
-    _ensureRepairResponseOk(response, fallbackMessage: 'Could not load repairs.');
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not load repairs.',
+    );
 
     final data = _dataMap(response);
-    final records = _recordList(data, fallback: response).map(RepairSummaryModel.fromJson).toList();
+    final records = _recordList(
+      data,
+      fallback: response,
+    ).map(RepairSummaryModel.fromJson).toList();
     final totalCount = _parseInt(data['total'] ?? response['total']);
 
-    return RepairListPage(repairs: records, hasMore: totalCount > 0 ? offset + records.length < totalCount : records.length >= pageSize, totalCount: totalCount);
+    return RepairListPage(
+      repairs: records,
+      hasMore: totalCount > 0
+          ? offset + records.length < totalCount
+          : records.length >= pageSize,
+      totalCount: totalCount,
+    );
   }
 
-  Future<RepairDetailModel> fetchRepairDetail(String repairId, {bool isKarigar = false}) async {
+  Future<RepairDetailModel> fetchRepairDetail(
+    String repairId, {
+    bool isKarigar = false,
+  }) async {
     // Switch endpoint based on type
-    final endpoint = isKarigar ? '${ApiEndpoints.karigarRepairDetail}/$repairId' : '${ApiEndpoints.repairDetail}/$repairId';
+    final endpoint = isKarigar
+        ? '${ApiEndpoints.karigarRepairDetail}/$repairId'
+        : '${ApiEndpoints.repairDetail}/$repairId';
 
     final response = await _apiProvider.get(endpoint);
 
-    _ensureRepairResponseOk(response, fallbackMessage: 'Could not load repair details.');
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not load repair details.',
+    );
 
     final data = _dataMap(response);
     final summary = RepairSummaryModel.fromJson(data);
     final itemSource = data['items'] ?? data['record'] ?? const <dynamic>[];
 
-    final items = itemSource is List ? itemSource.whereType<Map>().map((item) => RepairItemModel.fromJson(Map<String, dynamic>.from(item))).toList() : <RepairItemModel>[];
+    final items = itemSource is List
+        ? itemSource
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    RepairItemModel.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .toList()
+        : <RepairItemModel>[];
 
     return RepairDetailModel(summary: summary, items: items, raw: data);
   }
 
-  Future<List<BranchModel>> fetchBranches({String id = '', String name = ''}) async {
+  Future<List<BranchModel>> fetchBranches({
+    String id = '',
+    String name = '',
+  }) async {
     final response = await _apiProvider.post(
       ApiEndpoints.staffBranchRead,
       data: <String, dynamic>{
@@ -74,12 +113,21 @@ class RepairService extends GetxService {
         'search': <String, dynamic>{'id': id, 'name': name},
       },
     );
-    _ensureRepairResponseOk(response, fallbackMessage: 'Could not load branches.');
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not load branches.',
+    );
     final data = _dataMap(response);
-    return _recordList(data, fallback: response).map(BranchModel.fromJson).toList();
+    return _recordList(
+      data,
+      fallback: response,
+    ).map(BranchModel.fromJson).toList();
   }
 
-  Future<List<KarigarModel>> fetchKarigars({String id = '', String name = ''}) async {
+  Future<List<KarigarModel>> fetchKarigars({
+    String id = '',
+    String name = '',
+  }) async {
     final response = await _apiProvider.post(
       ApiEndpoints.karigarRead,
       data: <String, dynamic>{
@@ -87,17 +135,41 @@ class RepairService extends GetxService {
         'search': <String, dynamic>{'id': id, 'name': name},
       },
     );
-    _ensureRepairResponseOk(response, fallbackMessage: 'Could not load karigars.');
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not load karigars.',
+    );
     final data = _dataMap(response);
-    return _recordList(data, fallback: response).map(KarigarModel.fromJson).toList();
+    return _recordList(
+      data,
+      fallback: response,
+    ).map(KarigarModel.fromJson).toList();
   }
 
-  Future<KarigarModel> saveKarigar({String id = '0', required String name, required String mobileNo, required String password, required String address, required String shopName}) async {
+  Future<KarigarModel> saveKarigar({
+    String id = '0',
+    required String name,
+    required String mobileNo,
+    required String password,
+    required String address,
+    required String shopName,
+  }) async {
     final response = await _apiProvider.post(
-      id.trim().isEmpty || id.trim() == '0' ? ApiEndpoints.karigarStore : ApiEndpoints.karigarStoreById(id.trim()),
-      data: <String, dynamic>{'name': name.trim(), 'mobile_no': mobileNo.trim(), 'password': password.trim(), 'address': address.trim(), 'shop_name': shopName.trim()},
+      id.trim().isEmpty || id.trim() == '0'
+          ? ApiEndpoints.karigarStore
+          : ApiEndpoints.karigarStoreById(id.trim()),
+      data: <String, dynamic>{
+        'name': name.trim(),
+        'mobile_no': mobileNo.trim(),
+        'password': password.trim(),
+        'address': address.trim(),
+        'shop_name': shopName.trim(),
+      },
     );
-    _ensureRepairResponseOk(response, fallbackMessage: 'Could not save karigar.');
+    _ensureRepairResponseOk(
+      response,
+      fallbackMessage: 'Could not save karigar.',
+    );
     final data = _dataMap(response);
     final records = _recordList(data, fallback: response);
     if (records.isNotEmpty) {
@@ -106,8 +178,31 @@ class RepairService extends GetxService {
     return KarigarModel.fromJson(data);
   }
 
-  Future<Map<String, dynamic>> createRepair({required String uuid, required int entryNo, required String entryDate, required String partyName, required String partyMobile, required double advanceAmount, required String deliveryDate, required String notes, required List<RepairDraftItem> items}) {
-    return _storeRepair(endpoint: ApiEndpoints.repairStore, uuid: uuid, entryNo: entryNo, entryDate: entryDate, partyName: partyName, partyMobile: partyMobile, advanceAmount: advanceAmount, deliveryDate: deliveryDate, notes: notes, items: items);
+  Future<Map<String, dynamic>> createRepair({
+    required String uuid,
+    required int entryNo,
+    required String entryDate,
+    required String partyName,
+    required String partyMobile,
+    required double advanceAmount,
+    required String deliveryDate,
+    required String notes,
+    required int status,
+    required List<RepairDraftItem> items,
+  }) {
+    return _storeRepair(
+      endpoint: ApiEndpoints.repairStore,
+      uuid: uuid,
+      entryNo: entryNo,
+      entryDate: entryDate,
+      partyName: partyName,
+      partyMobile: partyMobile,
+      advanceAmount: advanceAmount,
+      deliveryDate: deliveryDate,
+      notes: notes,
+      status: status,
+      items: items,
+    );
   }
 
   Future<Map<String, dynamic>> updateRepair({
@@ -120,9 +215,22 @@ class RepairService extends GetxService {
     required double advanceAmount,
     required String deliveryDate,
     required String notes,
+    required int status,
     required List<RepairDraftItem> items,
   }) {
-    return _storeRepair(endpoint: ApiEndpoints.repairStoreById(repairId), uuid: uuid, entryNo: entryNo, entryDate: entryDate, partyName: partyName, partyMobile: partyMobile, advanceAmount: advanceAmount, deliveryDate: deliveryDate, notes: notes, items: items);
+    return _storeRepair(
+      endpoint: ApiEndpoints.repairStoreById(repairId),
+      uuid: uuid,
+      entryNo: entryNo,
+      entryDate: entryDate,
+      partyName: partyName,
+      partyMobile: partyMobile,
+      advanceAmount: advanceAmount,
+      deliveryDate: deliveryDate,
+      notes: notes,
+      status: status,
+      items: items,
+    );
   }
 
   Future<Map<String, dynamic>> _storeRepair({
@@ -135,6 +243,7 @@ class RepairService extends GetxService {
     required double advanceAmount,
     required String deliveryDate,
     required String notes,
+    required int status,
     required List<RepairDraftItem> items,
   }) {
     final totalQty = items.fold<int>(0, (sum, item) => sum + item.quantity);
@@ -151,6 +260,7 @@ class RepairService extends GetxService {
       'advance_amt': _amountString(advanceAmount),
       'delivery_date': deliveryDate,
       'notes': notes.trim(),
+      'status': status.toString(),
       'items': jsonEncode(items.map((item) => item.toApiJson()).toList()),
     };
 
@@ -161,12 +271,19 @@ class RepairService extends GetxService {
       }
     }
 
-    return _apiProvider.postMultipartFromPaths(endpoint, fields: fields, filePathEntries: fileEntries);
+    return _apiProvider.postMultipartFromPaths(
+      endpoint,
+      fields: fields,
+      filePathEntries: fileEntries,
+    );
   }
 
   Future<int> suggestNextEntryNo() async {
     final result = await fetchRepairs(page: 1, pageSize: 20);
-    final numbers = result.repairs.map((repair) => int.tryParse(repair.entryNo) ?? 0).where((value) => value > 0).toList();
+    final numbers = result.repairs
+        .map((repair) => int.tryParse(repair.entryNo) ?? 0)
+        .where((value) => value > 0)
+        .toList();
     if (numbers.isEmpty) {
       return 1;
     }
@@ -182,13 +299,20 @@ class RepairService extends GetxService {
   }
 
   String extractMessage(Map<String, dynamic> response) {
-    return (response['message'] ?? response['msg'] ?? response['error'] ?? response['response_message'] ?? '').toString();
+    return (response['message'] ??
+            response['msg'] ??
+            response['error'] ??
+            response['response_message'] ??
+            '')
+        .toString();
   }
 
   bool _isEmptyRepairList(Map<String, dynamic> response) {
     final message = extractMessage(response).toLowerCase();
     final data = response['data'];
-    return response['status'] == false && message.contains('record not found') && (data is List && data.isEmpty);
+    return response['status'] == false &&
+        message.contains('record not found') &&
+        (data is List && data.isEmpty);
   }
 
   Map<String, dynamic> _dataMap(Map<String, dynamic> response) {
@@ -202,10 +326,22 @@ class RepairService extends GetxService {
     return Map<String, dynamic>.from(response);
   }
 
-  List<Map<String, dynamic>> _recordList(Map<String, dynamic> data, {Map<String, dynamic>? fallback}) {
-    final dynamic raw = data['record'] ?? data['records'] ?? fallback?['record'] ?? fallback?['records'] ?? fallback?['data'] ?? const <dynamic>[];
+  List<Map<String, dynamic>> _recordList(
+    Map<String, dynamic> data, {
+    Map<String, dynamic>? fallback,
+  }) {
+    final dynamic raw =
+        data['record'] ??
+        data['records'] ??
+        fallback?['record'] ??
+        fallback?['records'] ??
+        fallback?['data'] ??
+        const <dynamic>[];
     if (raw is List) {
-      return raw.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+      return raw
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
     }
     return <Map<String, dynamic>>[];
   }
@@ -223,11 +359,15 @@ class RepairService extends GetxService {
     return value.toStringAsFixed(2);
   }
 
-  void _ensureRepairResponseOk(Map<String, dynamic> response, {required String fallbackMessage}) {
+  void _ensureRepairResponseOk(
+    Map<String, dynamic> response, {
+    required String fallbackMessage,
+  }) {
     final status = response['status'];
     final success = response['success'];
     final code = response['code']?.toString();
-    final isOk = status == true || success == true || code == null || code == '200';
+    final isOk =
+        status == true || success == true || code == null || code == '200';
     if (isOk) {
       return;
     }

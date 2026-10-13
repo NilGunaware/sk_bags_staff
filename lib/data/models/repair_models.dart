@@ -23,6 +23,10 @@ class RepairSummaryModel {
     required this.advanceAmount,
     required this.deliveryDate,
     required this.notes,
+    required this.status,
+    required this.branchName,
+    required this.shopName,
+    required this.karigarName,
     required this.raw,
   });
 
@@ -37,9 +41,14 @@ class RepairSummaryModel {
   final double advanceAmount;
   final String deliveryDate;
   final String notes;
+  final int status;
+  final String branchName;
+  final String shopName;
+  final String karigarName;
   final Map<String, dynamic> raw;
 
   double get balanceAmount => totalAmount - advanceAmount;
+  String get locationName => _firstNonEmpty(branchName, shopName);
 
   factory RepairSummaryModel.fromJson(Map<String, dynamic> json) {
     return RepairSummaryModel(
@@ -60,6 +69,10 @@ class RepairSummaryModel {
       ),
       deliveryDate: _stringValue(json['delivery_date'] ?? json['deliveryDate']),
       notes: _stringValue(json['notes'] ?? json['note']),
+      status: _parseInt(json['status'] ?? json['order_status']),
+      branchName: _stringValue(json['branch_name'] ?? json['branchName']),
+      shopName: _stringValue(json['shop_name'] ?? json['shopName']),
+      karigarName: _stringValue(json['karigar_name'] ?? json['karigarName']),
       raw: Map<String, dynamic>.from(json),
     );
   }
@@ -85,6 +98,7 @@ class RepairItemModel {
     required this.rate,
     required this.amount,
     required this.instruction,
+    required this.status,
     required this.attachments,
     required this.raw,
   });
@@ -95,6 +109,7 @@ class RepairItemModel {
   final double rate;
   final double amount;
   final String instruction;
+  final int status;
   final List<String> attachments;
   final Map<String, dynamic> raw;
 
@@ -108,6 +123,7 @@ class RepairItemModel {
       instruction: _stringValue(
         json['instruction'] ?? json['instructions'] ?? json['notes'],
       ),
+      status: _parseInt(json['status'] ?? json['item_status']),
       attachments: _parseAttachments(
         json['attatch_data'] ??
             json['attach_data'] ??
@@ -126,6 +142,7 @@ class RepairDraftItem {
     required this.quantity,
     required this.rate,
     required this.instruction,
+    this.status = 0,
     required this.attachmentPaths,
     this.existingAttachments = const <String>[],
   });
@@ -135,6 +152,7 @@ class RepairDraftItem {
   final int quantity;
   final double rate;
   final String instruction;
+  final int status;
   final List<String> attachmentPaths;
   final List<String> existingAttachments;
 
@@ -149,6 +167,7 @@ class RepairDraftItem {
       'rate': apiRate,
       'amt': amount,
       'instruction': instruction.trim(),
+      'status': status,
       'attatch_data': existingAttachments,
     };
   }
@@ -159,6 +178,7 @@ class RepairDraftItem {
     int? quantity,
     double? rate,
     String? instruction,
+    int? status,
     List<String>? attachmentPaths,
     List<String>? existingAttachments,
   }) {
@@ -168,10 +188,25 @@ class RepairDraftItem {
       quantity: quantity ?? this.quantity,
       rate: rate ?? this.rate,
       instruction: instruction ?? this.instruction,
+      status: status ?? this.status,
       attachmentPaths: attachmentPaths ?? this.attachmentPaths,
       existingAttachments: existingAttachments ?? this.existingAttachments,
     );
   }
+}
+
+String repairStatusLabel(int status) {
+  return switch (status) {
+    1 => 'Delivered',
+    2 => 'Cancelled',
+    _ => 'Pending',
+  };
+}
+
+String _firstNonEmpty(String first, String second) {
+  final firstText = first.trim();
+  if (firstText.isNotEmpty) return firstText;
+  return second.trim();
 }
 
 String _stringValue(dynamic value) => value?.toString() ?? '';

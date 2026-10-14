@@ -8,10 +8,42 @@ import 'package:http/http.dart' as http;
 
 import '../constants/api_endpoints.dart';
 import '../../data/models/order_models.dart';
+import '../../data/models/item_server_status.dart';
 
 class LocalItemSyncService extends GetxService {
-  final http.Client _client = http.Client();
+  LocalItemSyncService({http.Client? client})
+    : _client = client ?? http.Client();
+
+  final http.Client _client;
   static const Duration _serverTimeout = Duration(seconds: 12);
+  final serverStatuses = <String, ItemServerStatus>{
+    ApiEndpoints.ahmLabel: ItemServerStatus.checking,
+    ApiEndpoints.bhuLabel: ItemServerStatus.checking,
+  }.obs;
+
+  Future<ItemServerStatus> checkServerHealth(
+    String name,
+    String baseUrl,
+  ) async {
+    try {
+      final response = await _client
+          .get(Uri.parse('$baseUrl/health'))
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return ItemServerStatus.offline;
+      }
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic>) return ItemServerStatus.offline;
+      if (data['databaseReady'] == false) {
+        return ItemServerStatus.databaseUnavailable;
+      }
+      return _isHealthyResponse(data)
+          ? ItemServerStatus.online
+          : ItemServerStatus.offline;
+    } catch (_) {
+      return ItemServerStatus.offline;
+    }
+  }
 
   Future<Map<String, bool>> checkServersHealth() async {
     final outcomes = await Future.wait(
@@ -49,11 +81,12 @@ class LocalItemSyncService extends GetxService {
 
   bool _evalOutcomeHealthy(_FetchOutcome outcome) {
     if (!outcome.isReachable) return false;
-    if (outcome.statusCode != null && outcome.statusCode! >= 500) return false;
+    if (outcome.statusCode != null && outcome.statusCode! >= 400) return false;
+    if (outcome.response?['databaseReady'] == false) return false;
     if (outcome.response != null) {
       return _isHealthyResponse(outcome.response!);
     }
-    return true;
+    return false;
   }
 
   Future<List<PriceCategoryModel>> fetchPriceCategories() async {
@@ -197,25 +230,57 @@ class LocalItemSyncService extends GetxService {
     required int page,
     required int pageSize,
     required String query,
+    void Function(MergedItemPage page)? onPartialResult,
   }) async {
-    final merged = <String, MergedItemModel>{};
+    final completed = <String, _ServerItemBatch>{};
     final serverResults = await Future.wait(
-      _servers.map(
-        (server) => _safeSearchServer(
+      _servers.map((server) async {
+        final result = await _safeSearchServer(
           server: server,
           page: page,
           pageSize: pageSize,
           query: query,
-        ),
-      ),
+        );
+        completed[server.name] = result;
+        // Rebuild snapshots in server order so arrival order cannot change precedence.
+        onPartialResult?.call(
+          _mergeSearchResults(
+            serverResults: [
+              for (final configured in _servers)
+                if (completed.containsKey(configured.name))
+                  completed[configured.name]!,
+            ],
+            page: page,
+            pageSize: pageSize,
+            isComplete: completed.length == _servers.length,
+          ),
+        );
+        return result;
+      }),
       eagerError: false,
     );
+
+    return _mergeSearchResults(
+      serverResults: serverResults,
+      page: page,
+      pageSize: pageSize,
+      isComplete: true,
+    );
+  }
+
+  MergedItemPage _mergeSearchResults({
+    required List<_ServerItemBatch> serverResults,
+    required int page,
+    required int pageSize,
+    required bool isComplete,
+  }) {
+    final merged = <String, MergedItemModel>{};
 
     final reachableServerCount = serverResults
         .where((result) => result.isReachable)
         .length;
     final warnings = <String>[
-      if (reachableServerCount == 0)
+      if (isComplete && reachableServerCount == 0)
         'Item servers are unavailable right now. Check the dashboard status.'
       else
         for (final result in serverResults)
@@ -338,6 +403,7 @@ class LocalItemSyncService extends GetxService {
         isReachable = isReachable || outcome.isReachable;
         final response = outcome.response;
         if (response == null) {
+          if (!outcome.isReachable) break;
           continue;
         }
         receivedResponse = true;
@@ -433,7 +499,7 @@ class LocalItemSyncService extends GetxService {
         serverName: serverName,
         baseUrl: baseUrl,
         statusCode: error.statusCode,
-        isReachable: true,
+        isReachable: error.statusCode < 500,
       );
     } catch (error) {
       return _FetchOutcome(
@@ -456,43 +522,63 @@ class LocalItemSyncService extends GetxService {
     _logApiRequest('GET', uri, body: <String, dynamic>{});
     http.Response response;
     try {
-      response = await _client.get(
-        uri,
-        headers: const <String, String>{
-          'Accept': 'application/json, text/plain, */*',
-          'User-Agent': 'SKBagsStaff/1.0',
-        },
-      ).timeout(_serverTimeout);
-    } catch (error) {
-      // Retry once with a fresh one-off client in case pooled TCP socket died on mobile
-      try {
-        final freshClient = http.Client();
-        try {
-          response = await freshClient.get(
+      response = await _client
+          .get(
             uri,
             headers: const <String, String>{
               'Accept': 'application/json, text/plain, */*',
               'User-Agent': 'SKBagsStaff/1.0',
             },
-          ).timeout(_serverTimeout);
+          )
+          .timeout(_serverTimeout);
+    } catch (error) {
+      // Retry once with a fresh one-off client in case pooled TCP socket died on mobile
+      try {
+        final freshClient = http.Client();
+        try {
+          response = await freshClient
+              .get(
+                uri,
+                headers: const <String, String>{
+                  'Accept': 'application/json, text/plain, */*',
+                  'User-Agent': 'SKBagsStaff/1.0',
+                },
+              )
+              .timeout(_serverTimeout);
         } finally {
           freshClient.close();
         }
       } catch (retryError) {
+        _recordApiStatus(uri, ItemServerStatus.offline);
         _logApiError('GET', uri, retryError);
         rethrow;
       }
     }
     _logApiResponse(uri, response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode >= 500) {
+        _recordApiStatus(uri, ItemServerStatus.reconnecting);
+      }
       throw _HttpStatusException(response.statusCode);
     }
 
     final decoded = jsonDecode(response.body);
     if (decoded is Map<String, dynamic>) {
+      _recordApiStatus(uri, ItemServerStatus.online);
       return decoded;
     }
     throw Exception('Invalid item response');
+  }
+
+  void _recordApiStatus(Uri uri, ItemServerStatus status) {
+    if (uri.path == '/health') return;
+    for (final server in _servers) {
+      final base = Uri.parse(server.baseUrl);
+      if (uri.host == base.host && uri.port == base.port) {
+        serverStatuses[server.name] = status;
+        break;
+      }
+    }
   }
 
   void _logApiRequest(String method, Uri uri, {Object? body}) {

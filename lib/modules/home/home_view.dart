@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/utils/api_response_handler.dart';
 import '../../data/models/order_models.dart';
+import '../../data/models/item_server_status.dart';
 import '../../routes/app_routes.dart';
 import 'fallback_network_image.dart';
 import 'home_controller.dart';
@@ -1413,11 +1414,11 @@ class _CompactServerHealthStrip extends StatelessWidget {
         children: [
           _CompactServerHealthDot(
             label: ApiEndpoints.ahmLabel,
-            isOnline: states[ApiEndpoints.ahmLabel],
+            status: states[ApiEndpoints.ahmLabel] ?? ItemServerStatus.checking,
           ),
           _CompactServerHealthDot(
             label: ApiEndpoints.bhuLabel,
-            isOnline: states[ApiEndpoints.bhuLabel],
+            status: states[ApiEndpoints.bhuLabel] ?? ItemServerStatus.checking,
           ),
         ],
       );
@@ -1426,18 +1427,20 @@ class _CompactServerHealthStrip extends StatelessWidget {
 }
 
 class _CompactServerHealthDot extends StatelessWidget {
-  const _CompactServerHealthDot({required this.label, required this.isOnline});
+  const _CompactServerHealthDot({required this.label, required this.status});
 
   final String label;
-  final bool? isOnline;
+  final ItemServerStatus status;
 
   @override
   Widget build(BuildContext context) {
-    final dotColor = isOnline == true
-        ? const Color(0xFF2563EB)
-        : isOnline == false
-        ? const Color(0xFFD64545)
-        : Colors.grey.shade500;
+    final dotColor = switch (status) {
+      ItemServerStatus.online => const Color(0xFF2563EB),
+      ItemServerStatus.offline => const Color(0xFFD64545),
+      ItemServerStatus.databaseUnavailable => Colors.orange.shade800,
+      ItemServerStatus.reconnecting => Colors.orange.shade800,
+      ItemServerStatus.checking => Colors.grey.shade500,
+    };
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 136),
@@ -1456,8 +1459,8 @@ class _CompactServerHealthDot extends StatelessWidget {
           const SizedBox(width: 4),
           Flexible(
             child: Text(
-              label,
-              maxLines: 1,
+              '$label\n${status.label}',
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: dotColor,

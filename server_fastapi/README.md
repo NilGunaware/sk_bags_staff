@@ -28,6 +28,21 @@ It exposes:
 - ReDoc: `http://localhost:8000/redoc`
 - OpenAPI JSON: `http://localhost:8000/openapi.json`
 
+## Server Health
+
+`GET /health` returns API status, database name, version, and `databaseReady`.
+The service checks SQL connectivity with `SELECT 1` and shares the result for
+10 seconds across clients. A database failure returns HTTP 200 with
+`status: "degraded"` and `databaseReady: false`, distinguishing it from an
+unreachable API.
+
+`WS /ws/health` sends the same payload with `type: "health"` every 5 seconds.
+The staff app monitors each server independently, reconnects when foregrounded,
+and falls back to HTTP health when the deployed desktop build or router does
+not support WebSockets. Both desktop servers need rebuilt executables to expose
+the new heartbeat and database readiness fields. Stock continues to use the
+existing item APIs; heartbeat messages contain no stock data.
+
 ## Desktop Launcher
 
 Double-click this file on macOS:

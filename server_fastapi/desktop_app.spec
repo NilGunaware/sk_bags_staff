@@ -17,6 +17,8 @@ hiddenimports = [
     "uvicorn.loops.auto",
     "uvicorn.protocols.http.auto",
     "uvicorn.protocols.websockets.auto",
+    "uvicorn.protocols.websockets.websockets_impl",
+    "websockets.legacy.server",
     "uvicorn.lifespan.on",
 ]
 

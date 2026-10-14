@@ -9,6 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/api_endpoints.dart';
 import '../../core/services/local_item_sync_service.dart';
+import '../../core/services/item_server_monitor.dart';
+import '../../data/models/item_server_status.dart';
 import '../../core/services/order_cart_service.dart';
 import '../../core/services/order_service.dart';
 import '../../core/services/storage_service.dart';
@@ -52,10 +54,8 @@ class HomeController extends GetxController {
   final stockList = <Map<String, dynamic>>[].obs;
   final stockOffset = 0.obs;
   final stockTotal = 0.obs;
-  final serverHealthStates = <String, bool?>{
-    ApiEndpoints.ahmLabel: null,
-    ApiEndpoints.bhuLabel: null,
-  }.obs;
+  RxMap<String, ItemServerStatus> get serverHealthStates =>
+      _itemSyncService.serverStatuses;
   final isCheckingServerHealth = false.obs;
   final lastServerHealthCheck = Rxn<DateTime>();
   final isLoadingPriceCategories = false.obs;
@@ -64,7 +64,8 @@ class HomeController extends GetxController {
   final isPlacingCartOrder = false.obs;
   final activeDashboardModule = DashboardModule.physicalStock.obs;
 
-  Timer? _serverHealthTimer;
+  ItemServerMonitor? _serverMonitor;
+  bool _healthCheckInFlight = false;
 
   List<PriceCategoryModel> get priceCategories => cartService.priceCategories;
   PriceCategoryModel? get selectedPriceCategory =>
@@ -553,17 +554,29 @@ class HomeController extends GetxController {
   }
 
   Future<void> checkItemServersHealth({bool showLoading = false}) async {
+    if (_healthCheckInFlight) return;
+    _healthCheckInFlight = true;
     if (showLoading) {
       isCheckingServerHealth.value = true;
     }
 
     try {
-      final results = await _itemSyncService.checkServersHealth();
-      serverHealthStates.assignAll(
-        results.map((label, isOnline) => MapEntry(label, isOnline)),
-      );
+      await Future.wait([
+        for (final server in {
+          ApiEndpoints.ahmLabel: ApiEndpoints.ahmItemsBaseUrl,
+          ApiEndpoints.bhuLabel: ApiEndpoints.bhuItemsBaseUrl,
+        }.entries)
+          () async {
+            final status = await _itemSyncService.checkServerHealth(
+              server.key,
+              server.value,
+            );
+            if (!isClosed) serverHealthStates[server.key] = status;
+          }(),
+      ]);
       lastServerHealthCheck.value = DateTime.now();
     } finally {
+      _healthCheckInFlight = false;
       isCheckingServerHealth.value = false;
     }
   }
@@ -639,16 +652,12 @@ class HomeController extends GetxController {
     fetchProfile();
     loadPriceCategories();
     fetchStockList(refresh: true);
-    checkItemServersHealth(showLoading: true);
-    _serverHealthTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => checkItemServersHealth(),
-    );
+    _serverMonitor = ItemServerMonitor(_itemSyncService)..start();
   }
 
   @override
   void onClose() {
-    _serverHealthTimer?.cancel();
+    _serverMonitor?.dispose();
     scanQrcodeController.dispose();
     scanCodeController.dispose();
     scanCodeFocusNode.dispose();

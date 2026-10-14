@@ -19,6 +19,7 @@ class HealthResponse(BaseModel):
     status: str
     database: str
     version: str
+    databaseReady: bool = True
 
 
 class PaginationMeta(BaseModel):

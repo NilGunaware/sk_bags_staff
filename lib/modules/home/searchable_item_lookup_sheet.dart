@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -62,14 +60,10 @@ class SearchableItemLookupSheet extends StatefulWidget {
 
 class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
   static const int _pageSize = 20;
-  static const Duration _debounceDuration = Duration(milliseconds: 350);
 
   final LocalItemSyncService _itemSyncService =
       Get.find<LocalItemSyncService>();
   final TextEditingController _queryController = TextEditingController();
-  final Map<String, MergedItemModel> _loadedItems = <String, MergedItemModel>{};
-
-  Timer? _debounce;
   List<MergedItemModel> _items = const <MergedItemModel>[];
   List<String> _warnings = const <String>[];
   bool _isSearching = false;
@@ -84,54 +78,18 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _queryController.dispose();
     super.dispose();
   }
 
   void _onQueryChanged() {
-    _debounce?.cancel();
-    final query = _queryController.text.trim();
-
-    if (query.isEmpty) {
-      setState(() {
-        _items = const <MergedItemModel>[];
-        _warnings = const <String>[];
-        _message = null;
-        _isSearching = false;
-      });
-      return;
-    }
-
-    final localPage = _filterLocal(query);
-    if (localPage.items.isNotEmpty) {
-      setState(() {
-        _items = localPage.items;
-        _warnings = localPage.warnings;
-        _message = null;
-        _isSearching = false;
-      });
-      return;
-    }
-
+    ++_searchToken;
     setState(() {
       _items = const <MergedItemModel>[];
+      _warnings = const <String>[];
       _message = null;
+      _isSearching = false;
     });
-    _debounce = Timer(_debounceDuration, () => _searchRemote(query));
-  }
-
-  MergedItemPage _filterLocal(
-    String query, {
-    List<String> warnings = const [],
-  }) {
-    return _itemSyncService.filterLoadedItems(
-      items: _loadedItems.values,
-      page: 1,
-      pageSize: _pageSize,
-      query: query,
-      warnings: warnings,
-    );
   }
 
   Future<void> _searchRemote(String query) async {
@@ -146,21 +104,29 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
         page: 1,
         pageSize: _pageSize,
         query: query,
+        onPartialResult: (partialPage) {
+          if (!mounted || token != _searchToken) {
+            return;
+          }
+          setState(() {
+            _items = partialPage.items;
+            _warnings = partialPage.warnings;
+          });
+        },
       );
 
       if (!mounted || token != _searchToken) {
         return;
       }
 
-      for (final item in page.items) {
-        _loadedItems[item.key] = item;
-      }
-
-      final localPage = _filterLocal(query, warnings: page.warnings);
       setState(() {
-        _items = localPage.items.isNotEmpty ? localPage.items : page.items;
+        _items = page.items;
         _warnings = page.warnings;
-        _message = _items.isEmpty ? 'No item found for "$query".' : null;
+        _message = _items.isNotEmpty
+            ? null
+            : page.warnings.isNotEmpty
+            ? 'Search incomplete. Please try again.'
+            : 'No item found for "$query".';
       });
     } catch (error) {
       if (!mounted || token != _searchToken) {
@@ -199,10 +165,11 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
     final typedValue = SearchableItemLookupSheet.normalizeLookupValue(
       _queryController.text,
     );
-    if (typedValue.isEmpty) {
+    if (typedValue.isEmpty || _isSearching) {
       return;
     }
-    _complete(typedValue);
+    FocusManager.instance.primaryFocus?.unfocus();
+    _searchRemote(typedValue);
   }
 
   void _selectItem(MergedItemModel item) {
@@ -330,8 +297,10 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
                       Expanded(
                         child: Text(
                           _isSearching
-                              ? 'Searching both item servers...'
-                              : 'Select an item from the dropdown, or search typed value directly.',
+                              ? (_items.isEmpty
+                                    ? 'Searching item servers...'
+                                    : 'Loading remaining results...')
+                              : '',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 12,
@@ -339,9 +308,13 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
                           ),
                         ),
                       ),
-                      TextButton(
-                        onPressed: _submitTypedValue,
-                        child: const Text('Search Direct'),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isSearching || _queryController.text.trim().isEmpty
+                            ? null
+                            : _submitTypedValue,
+                        icon: const Icon(Icons.search),
+                        label: const Text('Search'),
                       ),
                     ],
                   ),
@@ -383,9 +356,11 @@ class _SearchableItemLookupSheetState extends State<SearchableItemLookupSheet> {
           padding: const EdgeInsets.all(18),
           child: Text(
             _message ??
-                (query.isEmpty
-                    ? 'Start typing an item code or item name.'
-                    : 'Keep typing to search by item code or item name.'),
+                (_isSearching
+                    ? 'Searching...'
+                    : query.isEmpty
+                    ? 'Enter an item code or keyword.'
+                    : ''),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey.shade600,

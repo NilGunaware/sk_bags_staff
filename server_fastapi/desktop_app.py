@@ -485,6 +485,7 @@ class ServerManager:
             access_log=True,
             reload=False,
             workers=1,
+            ws="websockets",
             log_config=None,
             lifespan="on",
         )

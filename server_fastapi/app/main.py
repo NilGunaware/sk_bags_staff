@@ -4,7 +4,9 @@ from contextlib import asynccontextmanager
 from datetime import date
 import json
 import logging
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+import asyncio
+from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,6 +41,7 @@ from .service import (
     list_price_categories,
 )
 from .version import APP_VERSION
+from .health import health_snapshot
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -242,7 +245,19 @@ def api_meta() -> RootResponse:
 
 @app.get("/health", response_model=HealthResponse, tags=["Meta"])
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", database=settings.db_name, version=APP_VERSION)
+    return health_snapshot()
+
+
+@app.websocket("/ws/health")
+async def health_events(websocket: WebSocket) -> None:
+    await websocket.accept()
+    try:
+        while True:
+            snapshot = await run_in_threadpool(health_snapshot)
+            await websocket.send_json({"type": "health", **snapshot.model_dump()})
+            await asyncio.sleep(5)
+    except (WebSocketDisconnect, OSError):
+        pass
 
 
 @app.get(

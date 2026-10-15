@@ -206,6 +206,15 @@ def _versioned_exe_name(version: str) -> str:
     return f"SKBagsDesktop-{safe_version}.exe"
 
 
+def _updater_environment() -> dict[str, str]:
+    environment = {
+        key: value for key, value in os.environ.items()
+        if not key.startswith('_PYI_') and key != '_MEIPASS2'
+    }
+    environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+    return environment
+
+
 def _write_update_script(new_exe: Path, target_exe: Path, current_exe: Path, pid: int) -> Path:
     script_path = Path(tempfile.gettempdir()) / f"skbags_update_{int(time.time())}.bat"
     log_path = target_exe.parent / "SKBagsDesktop-update.log"
@@ -215,6 +224,11 @@ set "NEW_EXE={new_exe}"
 set "TARGET_EXE={target_exe}"
 set "CURRENT_EXE={current_exe}"
 set "UPDATE_LOG={log_path}"
+set "PYINSTALLER_RESET_ENVIRONMENT=1"
+set "_MEIPASS2="
+set "_PYI_APPLICATION_HOME_DIR="
+set "_PYI_PARENT_PROCESS_LEVEL="
+set "_PYI_ARCHIVE_FILE="
 
 echo [%date% %time%] Waiting for old app PID {pid}.>"%UPDATE_LOG%"
 
@@ -231,15 +245,16 @@ timeout /t 2 /nobreak >nul
 
 :replace
 echo [%date% %time%] Copying "%NEW_EXE%" to "%TARGET_EXE%".>>"%UPDATE_LOG%"
-copy /Y "{new_exe}" "{target_exe}" >nul
-if errorlevel 1 (
-  echo [%date% %time%] Update failed. Could not replace executable.>>"%UPDATE_LOG%"
-  echo Update failed. Could not replace executable.
-  pause
-  exit /b 1
+for /l %%i in (1,1,15) do (
+  copy /Y "%NEW_EXE%" "%TARGET_EXE%" >>"%UPDATE_LOG%" 2>&1
+  if not errorlevel 1 goto launch
+  timeout /t 1 /nobreak >nul
 )
+echo [%date% %time%] Update failed. Could not copy executable.>>"%UPDATE_LOG%"
+exit /b 1
+:launch
 echo [%date% %time%] Starting "%TARGET_EXE%".>>"%UPDATE_LOG%"
-start "" "{target_exe}"
+start "" /D "{target_exe.parent}" "%TARGET_EXE%"
 timeout /t 8 /nobreak >nul
 if /I not "%CURRENT_EXE%"=="%TARGET_EXE%" (
   echo [%date% %time%] Leaving old executable in place: "%CURRENT_EXE%".>>"%UPDATE_LOG%"
@@ -1351,8 +1366,6 @@ class DesktopApp:
         sha256: str,
         manual: bool,
     ) -> None:
-        self.is_update_check_running = False
-        self.update_button.state(["!disabled"])
         message = f"Update {latest_version} is available."
         self.update_status_var.set(message)
         self.server_manager.log(message)
@@ -1367,6 +1380,8 @@ class DesktopApp:
 
         if should_install:
             self.install_update(latest_version, download_url, sha256)
+        else:
+            self._finish_update_check(message)
 
     def _finish_update_check(self, message: str) -> None:
         self.is_update_check_running = False
@@ -1375,6 +1390,7 @@ class DesktopApp:
         self.server_manager.log(message)
 
     def install_update(self, latest_version: str, download_url: str, sha256: str) -> None:
+        self.is_update_check_running = True
         self.update_status_var.set(f"Downloading update {latest_version}...")
         self.update_button.state(["disabled"])
         thread = threading.Thread(
@@ -1458,9 +1474,11 @@ class DesktopApp:
             if hasattr(subprocess, "DETACHED_PROCESS"):
                 creation_flags |= subprocess.DETACHED_PROCESS
             subprocess.Popen(
-                ["cmd", "/c", str(script_path)],
+                [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", str(script_path)],
                 creationflags=creation_flags,
                 close_fds=True,
+                env=_updater_environment(),
+                cwd=str(script_path.parent),
             )
         except Exception as error:
             self._finish_update_check(f"Could not launch updater: {error}")

@@ -27,8 +27,8 @@ if ($cert.NotAfter -le (Get-Date)) { throw 'Signing certificate has expired.' }
 Export-Certificate -Cert $cert -FilePath 'dist/SKBagsDesktop-Certificate.cer' | Out-Null
 if ($mode -eq 'self-signed') {
     # Trust only on the disposable build runner so Windows verifies hashes and timestamps.
-    Import-Certificate -FilePath 'dist/SKBagsDesktop-Certificate.cer' `
-        -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+    & certutil.exe -addstore -f Root 'dist/SKBagsDesktop-Certificate.cer'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not prepare isolated runner certificate trust.' }
 }
 @"
 SK Bags Desktop release signing

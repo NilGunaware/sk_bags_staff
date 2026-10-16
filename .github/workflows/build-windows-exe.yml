@@ -40,10 +40,16 @@ jobs:
 
       - name: Prepare release version
         id: version
+        env:
+          VERSION_INPUT: ${{ github.event.inputs.version }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="$VERSION_INPUT"
           if [ -z "$VERSION" ]; then
             VERSION="$(python -c "from pathlib import Path; namespace = {}; exec(Path('server_fastapi/app/version.py').read_text(encoding='utf-8'), namespace); print(namespace['APP_VERSION'])")"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must be MAJOR.MINOR.PATCH"
+            exit 1
           fi
           TAG="desktop-v${VERSION}"
           MANIFEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/latest.json"
@@ -63,6 +69,38 @@ jobs:
         working-directory: server_fastapi
         run: pyinstaller --noconfirm --clean desktop_app.spec
 
+      - name: Prepare signing certificate
+        working-directory: server_fastapi
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: ./prepare-signing.ps1
+
+      - name: Sign desktop executable
+        working-directory: server_fastapi
+        shell: pwsh
+        env:
+          DESKTOP_VERSION: ${{ steps.version.outputs.version }}
+        run: ./sign-file.ps1 -FilePath "dist/SKBagsDesktop-$env:DESKTOP_VERSION.exe"
+
+      - name: Build signed installer and uninstaller
+        working-directory: server_fastapi
+        shell: pwsh
+        env:
+          DESKTOP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler is missing.' }
+          $signCommand = 'skauth=pwsh.exe -NoProfile -File $q' + (Join-Path (Get-Location) 'sign-file.ps1') + '$q -FilePath $f'
+          & $iscc "/DAppVersion=$env:DESKTOP_VERSION" "/S$signCommand" installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Signed installer build failed.' }
+          $signature = Get-AuthenticodeSignature "dist/SKBagsDesktop-Setup-$env:DESKTOP_VERSION.exe"
+          if ($signature.SignerCertificate.Thumbprint -ne $env:SKBAGS_CERT_THUMBPRINT) {
+            throw 'Installer signer does not match app signer.'
+          }
+
       - name: Generate update manifest
         run: |
           EXE_NAME="SKBagsDesktop-${{ steps.version.outputs.version }}.exe"
@@ -71,6 +109,15 @@ jobs:
           DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.version.outputs.tag }}/${EXE_NAME}"
           printf '{\n  "version": "%s",\n  "url": "%s",\n  "sha256": "%s",\n  "fileName": "%s"\n}\n' "${{ steps.version.outputs.version }}" "$DOWNLOAD_URL" "$SHA256" "$EXE_NAME" > server_fastapi/dist/latest.json
 
+      - name: Create complete Windows download
+        working-directory: server_fastapi
+        shell: pwsh
+        env:
+          DESKTOP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $files = @("dist/SKBagsDesktop-$env:DESKTOP_VERSION.exe", "dist/SKBagsDesktop-Setup-$env:DESKTOP_VERSION.exe", 'dist/SKBagsDesktop-Certificate.cer', 'dist/SIGNING.txt', 'dist/latest.json')
+          Compress-Archive -Path $files -DestinationPath "dist/SKBagsDesktop-Windows-$env:DESKTOP_VERSION.zip" -Force
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -78,6 +125,10 @@ jobs:
           path: |
             server_fastapi/dist/SKBagsDesktop-${{ steps.version.outputs.version }}.exe
             server_fastapi/dist/latest.json
+            server_fastapi/dist/SKBagsDesktop-Setup-${{ steps.version.outputs.version }}.exe
+            server_fastapi/dist/SKBagsDesktop-Certificate.cer
+            server_fastapi/dist/SIGNING.txt
+            server_fastapi/dist/SKBagsDesktop-Windows-${{ steps.version.outputs.version }}.zip
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -88,3 +139,7 @@ jobs:
           files: |
             server_fastapi/dist/SKBagsDesktop-${{ steps.version.outputs.version }}.exe
             server_fastapi/dist/latest.json
+            server_fastapi/dist/SKBagsDesktop-Setup-${{ steps.version.outputs.version }}.exe
+            server_fastapi/dist/SKBagsDesktop-Certificate.cer
+            server_fastapi/dist/SIGNING.txt
+            server_fastapi/dist/SKBagsDesktop-Windows-${{ steps.version.outputs.version }}.zip

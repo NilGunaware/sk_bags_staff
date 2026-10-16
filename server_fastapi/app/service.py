@@ -11,6 +11,7 @@ from .config import settings
 from .db import db_connection, rows_to_dicts
 
 
+# Tran2 RecType=2 contains physical stock; other types include orders/quotations.
 ITEM_BASE_CTE_DATED_STOCK = """
 WITH StockAgg AS (
     SELECT
@@ -40,9 +41,9 @@ WITH StockAgg AS (
         FROM dbo.Tran2 t
         LEFT JOIN dbo.Tran1 v
             ON v.VchCode = t.VchCode
-        WHERE t.Date >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
+        WHERE t.RecType = 2
+          AND t.Date >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
           AND t.Date < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
-          AND t.VchType <> 26
           AND (
             v.VchCode IS NULL
             OR (ISNULL(v.VchCancelled, 0) = 0 AND ISNULL(v.Cancelled, 0) = 0)
@@ -423,10 +424,10 @@ def _load_branch_stocks(cursor: Any, item_master_code: int) -> list[dict[str, An
                     FROM dbo.Tran2 t
                     LEFT JOIN dbo.Tran1 v
                         ON v.VchCode = t.VchCode
-                    WHERE t.MasterCode1 = %(item_master_code)s
+                    WHERE t.RecType = 2
+                      AND t.MasterCode1 = %(item_master_code)s
                       AND t.Date >= DATEADD(month, 3, DATEADD(year, DATEDIFF(year, 0, DATEADD(month, -3, GETDATE())), 0))
                       AND t.Date < DATEADD(day, DATEDIFF(day, 0, GETDATE()) + 1, 0)
-                      AND t.VchType <> 26
                       AND (
                         v.VchCode IS NULL
                         OR (ISNULL(v.VchCancelled, 0) = 0 AND ISNULL(v.Cancelled, 0) = 0)

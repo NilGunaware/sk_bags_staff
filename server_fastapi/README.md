@@ -45,6 +45,39 @@ existing item APIs; heartbeat messages contain no stock data.
 
 ## Desktop Launcher
 
+### Signed Windows Installer
+
+Windows releases include:
+
+- `SKBagsDesktop-Setup-VERSION.exe`: signed Inno Setup installer and uninstaller.
+- `SKBagsDesktop-VERSION.exe`: signed portable executable used by the updater.
+- `SKBagsDesktop-Certificate.cer`: public signing certificate only.
+- `SIGNING.txt`: certificate identity, thumbprint, expiry, and signing mode.
+- `SKBagsDesktop-Windows-VERSION.zip`: complete download package.
+
+Setup installs for the current Windows user into
+`%LOCALAPPDATA%\Programs\SK Bags Desktop`, creates a Start menu shortcut,
+and offers optional Desktop and sign-in startup shortcuts. The installed app
+uses `SKBagsDesktop.exe` as a stable shortcut target; its Windows file properties
+contain the release version. Self-updates replace that stable target. Portable
+updates continue to use versioned filenames. Existing `.env` settings are not
+overwritten or removed by Setup. Moving from a portable folder to an installer
+requires entering that installation's database settings once.
+
+The workflow uses GitHub repository secrets `WINDOWS_SIGNING_PFX_BASE64` and
+`WINDOWS_SIGNING_PFX_PASSWORD` when provided. Use a reusable code-signing PFX
+with its private key and any required intermediates. Only the public certificate
+is distributed; the private PFX is deleted from runner temporary storage after
+import. Without these secrets, each build generates a new self-signed certificate,
+matching the HMT reference approach. Self-signed releases are **not automatically
+trusted** by Windows and may still show publisher/SmartScreen warnings. A
+publicly trusted code-signing identity requires an appropriate CA-issued
+certificate or signing service; signing does not guarantee SmartScreen reputation.
+
+The build timestamps and verifies the app, installer, and uninstaller signatures.
+It calculates the auto-update SHA-256 only after signing the app. Setup does not
+import trusted roots, modify antivirus exclusions, or change firewall rules.
+
 Double-click this file on macOS:
 
 - `server_fastapi/launch_desktop.command`
@@ -169,6 +202,9 @@ The updater uses:
 - fallback item code uses `MasterSupport.C1`, then `Master1.Code`
 - `itemName` comes from `Master1.Name`
 - `itemQuantity` comes from the branch-wise stock total used for Busy stock status
+- Physical stock uses `Tran4.RecType=0` opening balances plus `Tran2.RecType=2`
+  movements, excluding cancelled vouchers and out-of-period transactions.
+  Other `Tran2` record types must not be included as physical inventory.
 - item-level QR code is not available in the current database, so `qrCode` is returned as `null`
 - orders are stored in:
   - `dbo.ApiOrders`

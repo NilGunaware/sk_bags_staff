@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from desktop_app import _updater_environment, _write_update_script, _is_newer_version
+from desktop_app import _updater_environment, _write_update_script, _is_newer_version, _update_target_path
 
 
 class UpdaterTests(unittest.TestCase):
@@ -36,3 +36,12 @@ class UpdaterTests(unittest.TestCase):
     def test_new_release_is_detected(self):
         self.assertTrue(_is_newer_version('1.0.23', '1.0.22'))
         self.assertFalse(_is_newer_version('1.0.23', '1.0.23'))
+
+    def test_installed_app_updates_shortcut_target(self):
+        current = Path('installed') / 'SKBagsDesktop.exe'
+        self.assertEqual(_update_target_path(current, '1.0.24'), current)
+
+    def test_portable_app_keeps_versioned_update_name(self):
+        current = Path('portable') / 'SKBagsDesktop-1.0.23.exe'
+        self.assertEqual(_update_target_path(current, '1.0.24'),
+            current.parent / 'SKBagsDesktop-1.0.24.exe')

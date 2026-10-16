@@ -206,6 +206,13 @@ def _versioned_exe_name(version: str) -> str:
     return f"SKBagsDesktop-{safe_version}.exe"
 
 
+def _update_target_path(current_exe: Path, version: str) -> Path:
+    # Installer shortcuts keep a stable target across self-updates.
+    if current_exe.name.lower() == 'skbagsdesktop.exe':
+        return current_exe
+    return current_exe.parent / _versioned_exe_name(version)
+
+
 def _updater_environment() -> dict[str, str]:
     environment = {
         key: value for key, value in os.environ.items()
@@ -1408,7 +1415,7 @@ class DesktopApp:
                     "Updater can install only from the packaged Windows EXE."
                 )
 
-            target_exe = current_exe.parent / _versioned_exe_name(latest_version)
+            target_exe = _update_target_path(current_exe, latest_version)
             download_path = Path(tempfile.gettempdir()) / _versioned_exe_name(latest_version)
 
             self.root.after(
@@ -1466,7 +1473,7 @@ class DesktopApp:
 
     def _launch_update_script(self, script_path: Path, latest_version: str) -> None:
         self.update_status_var.set(f"Installing update {latest_version}. App will restart...")
-        self.server_manager.log(f"Installing update {latest_version}. The app will restart into a versioned EXE.")
+        self.server_manager.log(f"Installing update {latest_version}. The app will restart after installation.")
         try:
             creation_flags = 0
             if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):

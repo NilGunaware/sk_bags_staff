@@ -8,10 +8,8 @@ if (-not $tool) { throw 'Windows SDK SignTool is required.' }
     /tr http://timestamp.digicert.com /td SHA256 $FilePath
 if ($LASTEXITCODE -ne 0) { throw "SignTool failed for $FilePath" }
 $signature = Get-AuthenticodeSignature -FilePath $FilePath
-$allowed = @('Valid')
-if ($env:SKBAGS_SIGNING_MODE -eq 'self-signed') { $allowed += 'NotTrusted' }
 if ($signature.SignerCertificate.Thumbprint -ne $env:SKBAGS_CERT_THUMBPRINT -or
-    $signature.Status.ToString() -notin $allowed -or
+    $signature.Status.ToString() -ne 'Valid' -or
     -not $signature.TimeStamperCertificate) {
     throw "Signature verification failed: $($signature.Status) - $($signature.StatusMessage)"
 }

@@ -25,6 +25,11 @@ if ($cert.NotAfter -le (Get-Date)) { throw 'Signing certificate has expired.' }
 "SKBAGS_CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 "SKBAGS_SIGNING_MODE=$mode" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 Export-Certificate -Cert $cert -FilePath 'dist/SKBagsDesktop-Certificate.cer' | Out-Null
+if ($mode -eq 'self-signed') {
+    # Trust only on the disposable build runner so Windows verifies hashes and timestamps.
+    Import-Certificate -FilePath 'dist/SKBagsDesktop-Certificate.cer' `
+        -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+}
 @"
 SK Bags Desktop release signing
 Mode: $mode
